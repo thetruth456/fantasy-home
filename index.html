@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fantasy home base</title>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<header class="site"><div class="in"><a class="brand" href="index.html">Fantasy home base</a><nav class="tabs" role="tablist" aria-label="Leagues"><button type="button" role="tab" data-p="best" aria-selected="true">Best League</button><button type="button" role="tab" data-p="zbt" aria-selected="false">ZBT</button><button type="button" role="tab" data-p="oops" aria-selected="false">Oopsilons</button><button type="button" role="tab" data-p="spacex" aria-selected="false">SpaceX FF</button></nav></div></header>
+<div class="wrap">
+<h1>Fantasy home base</h1>
+<p class="asof">Pick a league tab to see its weekly flex tiebreaker snapshots.</p>
+<div class="panel" id="p-best" role="tabpanel">
+<section><h2>Best League</h2>
+<p class="meta">Sleeper league 1389358450705727488 &middot; 12 teams &middot; 4-2, 4th</p>
+<a class="btnlink" href="best-league.html">Open league page</a>
+</section>
+<section><h2>Week</h2>
+<p class="cap">Weekly snapshots, newest first.</p>
+<ul class="weeks"><li>No weekly snapshots yet.</li></ul></section>
+</div>
+<div class="panel" id="p-zbt" role="tabpanel">
+<section><h2>ZBT</h2>
+<p class="meta">Sleeper league 1389375330296279040 &middot; 14 teams &middot; 4-2, 4th</p>
+<a class="btnlink" href="zbt.html">Open league page</a>
+</section>
+<section><h2>Week</h2>
+<p class="cap">Weekly snapshots, newest first.</p>
+<ul class="weeks"><li><a href="zbt.html">Week 7 (latest)</a></li></ul></section>
+</div>
+<div class="panel" id="p-oops" role="tabpanel">
+<section><h2>Oopsilons</h2>
+<p class="meta">Sleeper league 1389754735367589888 &middot; 12 teams</p>
+<a class="btnlink" href="oopsilons.html">Open league page</a>
+</section>
+<section><h2>Week</h2>
+<p class="cap">Weekly snapshots, newest first.</p>
+<ul class="weeks"><li>No weekly snapshots yet.</li></ul></section>
+</div>
+<div class="panel" id="p-spacex" role="tabpanel">
+<section><h2>SpaceX FF</h2>
+<p class="meta">Sleeper league 1398902725940367360 &middot; 12 teams</p>
+<a class="btnlink" href="spacex-ff.html">Open league page</a>
+</section>
+<section><h2>Week</h2>
+<p class="cap">Weekly snapshots, newest first.</p>
+<ul class="weeks"><li>No weekly snapshots yet.</li></ul></section>
+</div>
+</div>
+<footer>Sleeper username: kfelder30</footer>
+<script>
+(function(){
+var ids=["best","zbt","oops","spacex"];
+var tabs=document.querySelectorAll(".tabs button");
+function show(id){if(ids.indexOf(id)<0)id="best";
+for(var i=0;i<ids.length;i++){document.getElementById("p-"+ids[i]).hidden=ids[i]!==id}
+for(var j=0;j<tabs.length;j++){tabs[j].setAttribute("aria-selected",tabs[j].getAttribute("data-p")===id)}
+if(history.replaceState)history.replaceState(null,"","#"+id)}
+for(var k=0;k<tabs.length;k++){tabs[k].onclick=function(){show(this.getAttribute("data-p"))}}
+show(location.hash.replace("#",""));
+})();
+</script>
+</body></html>
