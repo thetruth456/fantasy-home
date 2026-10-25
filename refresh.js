@@ -8,8 +8,8 @@ var FILES={best:"best-league-report.js",zbt:"zbt-report.js",oops:"oopsilons-repo
 var SKIP={Played:1,Bye:1,Out:1,IR:1};
 function metaOf(k){var D=window.REPORTS&&window.REPORTS[k];return D&&D.META||null}
 function projUrl(m){return API+"/projections/nfl/"+m.season+"/"+m.week+"?season_type="+(m.season_type||"regular")+"&position%5B%5D=QB&position%5B%5D=RB&position%5B%5D=WR&position%5B%5D=TE&position%5B%5D=K&position%5B%5D=DEF"}
-var btn=document.getElementById("refresh-btn"),st=document.getElementById("refresh-status");
-if(!btn||!st)return;
+var st=document.getElementById("refresh-status");
+if(!st)return;
 function getJSON(url,ms){var c=new AbortController(),t=setTimeout(function(){c.abort()},ms||25000);
 return fetch(url,{cache:"no-store",signal:c.signal}).then(function(r){clearTimeout(t);if(!r.ok)throw new Error("HTTP "+r.status);return r.json()},function(e){clearTimeout(t);throw e})}
 function ptNow(){try{var f=new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).formatToParts(new Date()),o={};f.forEach(function(p){o[p.type]=p.value});return o.month+" "+o.day+", "+o.hour+":"+o.minute+" "+o.dayPeriod+" PT"}catch(e){return new Date().toLocaleString()}}
@@ -18,32 +18,6 @@ function round1(v){/* same as Python round(v,1): exact .25/.75 ties go to the ev
 var q=v*4;if(q===Math.floor(q)&&Math.abs(q%2)===1){var t=Math.floor(v*10);return (t%2===0?t:t+1)/10}
 return Number(v.toFixed(1))}
 function setStatus(msg,cls){st.textContent=msg;st.className="refresh-status"+(cls?" "+cls:"")}
-btn.addEventListener("click",function(){
-if(btn.disabled)return;
-btn.disabled=true;btn.setAttribute("aria-busy","true");btn.classList.add("loading");btn.querySelector(".lbl").textContent="Refreshing\u2026";setStatus("Fetching Sleeper projections\u2026","busy");
-var keys=Object.keys(window.REPORTS||{}).filter(function(k){return metaOf(k)&&metaOf(k).league_id});
-if(!keys.length){setStatus("No report data loaded yet.","err");btn.disabled=false;btn.classList.remove("loading");btn.querySelector(".lbl").textContent="Refresh Sleeper projections";return}
-var scoring={};
-var projP=getJSON(projUrl(metaOf(keys[0])),40000);
-var leaguesP=Promise.all(keys.map(function(k){return getJSON(API+"/v1/league/"+metaOf(k).league_id,15000).then(function(L){scoring[k]=(L&&L.scoring_settings&&Object.keys(L.scoring_settings).length)?L.scoring_settings:metaOf(k).scoring},function(){scoring[k]=metaOf(k).scoring})}));
-Promise.all([projP,leaguesP]).then(function(r){
-var list=r[0];if(!Array.isArray(list)||list.length<100)throw new Error("unexpected projection data");
-var by={};list.forEach(function(x){if(x&&x.player_id&&x.stats)by[x.player_id]=x.stats});
-var changed=0,updated=0,kept=0;
-var updates=[];
-keys.forEach(function(k){var D=window.REPORTS[k],S=scoring[k];
-["STARTERS","BENCH","WAIVER"].forEach(function(g){D[g].forEach(function(p){
-if(SKIP[p.status]||!p.sid||!/^\d+(\.\d+)?$/.test(String(p.proj)))return;
-var s=by[p.sid];if(!s){kept++;return}
-var pn=round1(score(S,s));updates.push([p,pn])})})});
-updates.forEach(function(u){var p=u[0],pn=u[1];updated++;if(pn!==p.pn)changed++;p.pn=pn;p.proj=pn.toFixed(1)});
-keys.forEach(function(k){if(window.REDRAW&&window.REDRAW[k])window.REDRAW[k]()});
-setStatus("Sleeper proj refreshed "+ptNow()+" \u00b7 "+changed+" of "+updated+" values changed"+(kept?" ("+kept+" not found, kept)":""),"ok");
-}).catch(function(e){
-setStatus("Couldn\u2019t refresh Sleeper projections ("+(e&&e.name==="AbortError"?"timed out":(e&&e.message)||"network error")+"). Showing the snapshot values.","err")
-}).then(function(){btn.disabled=false;btn.removeAttribute("aria-busy");btn.classList.remove("loading");btn.querySelector(".lbl").textContent="Refresh Sleeper projections"});
-});
-
 /* ---- Refresh everything: dispatch the GitHub Actions update workflow, wait for it, then re-read the data files ---- */
 var fbtn=document.getElementById("full-btn"),panel=document.getElementById("token-panel"),form=document.getElementById("token-form"),
 input=document.getElementById("token-input"),cancel=document.getElementById("token-cancel"),tmsg=document.getElementById("token-msg"),clr=document.getElementById("token-clear");
@@ -74,7 +48,7 @@ var f=FILES[key];
 return gh("/repos/"+REPO+"/contents/"+f+"?ref="+REF,{accept:"application/vnd.github.raw+json"}).then(function(r){if(!r.ok)throw 0;return r.text()})
 .catch(function(){return fetch(f+"?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.text()})})
 .then(function(t){return parseData(t,key)})}
-function fbusy(on){fbtn.disabled=on;btn.disabled=on;fbtn.classList.toggle("loading",on);if(on)fbtn.setAttribute("aria-busy","true");else fbtn.removeAttribute("aria-busy");fbtn.querySelector(".lbl").textContent=on?"Refreshing everything\u2026":"Refresh everything"}
+function fbusy(on){fbtn.disabled=on;fbtn.classList.toggle("loading",on);if(on)fbtn.setAttribute("aria-busy","true");else fbtn.removeAttribute("aria-busy");fbtn.querySelector(".lbl").textContent=on?"Refreshing everything\u2026":"Refresh everything"}
 function fullRefresh(){
 if(fbtn.disabled)return;
 if(!tok()){openPanel("");return}

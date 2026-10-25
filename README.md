@@ -48,7 +48,7 @@ Requires Python 3.9+ (`pip install -r tools/requirements.txt` gives zoneinfo dat
 
 ## Buttons in the header
 
-* **Refresh Sleeper projections**: runs in the browser, re-pulls the current week's projections and each league's scoring from Sleeper and re-scores the plain-projection rows. Props, FP ranks and prop-implied pts stay as they are. The week, season and league ids come from the data files' `META`.
+* **Refresh everything**: the single header button. It triggers the GitHub Actions update (rosters, Sleeper projections, props, FantasyPros ranks) and then reloads the data. Needs a one-time fine-grained token (stored only in the browser).
 * **Refresh everything**: asks GitHub to run the update workflow now (`force=true`), waits for it to finish, reloads the four data files and redraws without reloading the page.
   * First click shows a one-time setup: create a fine-grained personal access token at https://github.com/settings/personal-access-tokens/new with Repository access: only `fantasy-home`, and Repository permissions: Actions: Read and write. Paste it into the panel.
   * The token is stored only in this browser's localStorage under `fh_gh_token`. It is never in the repo. "Forget GitHub token" removes it.
