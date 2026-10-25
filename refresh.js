@@ -2,10 +2,12 @@
    re-scores every plain-projection row, and redraws the tables. Props, FantasyPros ranks and prop-implied pts stay as the snapshot.
    Rows that already played (final score), or are Bye/Out/IR, are never overwritten. Fetched once, shared by all leagues on the page. */
 (function(){
-var LEAGUES={"best":{"id":"1389358450705727488","scoring":{"sack":1.0,"fgm_40_49":2.0,"pass_int":-2.0,"pts_allow_0":10.0,"pass_2pt":2.0,"st_td":0.0,"rec_td":6.0,"fgm_30_39":1.5,"xpmiss":0.0,"rush_td":6.0,"rec_2pt":2.0,"st_fum_rec":0.0,"fgmiss":0.0,"ff":0.0,"rec":0.5,"pts_allow_14_20":1.0,"fgm_0_19":1.5,"int":2.0,"def_st_fum_rec":1.0,"fum_lost":-2.0,"pts_allow_1_6":7.0,"fgm_20_29":1.5,"pts_allow_21_27":0.0,"xpm":0.5,"rush_2pt":2.0,"fum_rec":2.0,"def_st_td":6.0,"fgm_50p":2.5,"def_td":6.0,"safe":2.0,"pass_yd":0.04,"blk_kick":0.0,"pass_td":4.0,"rush_yd":0.1,"fum":0.0,"pts_allow_28_34":-1.0,"pts_allow_35p":-4.0,"fum_rec_td":6.0,"rec_yd":0.1,"def_st_ff":1.0,"pts_allow_7_13":4.0,"st_ff":0.0}},"zbt":{"id":"1389375330296279040","scoring":{"sack":1.0,"qb_hit":0.0,"fgm_40_49":4.0,"bonus_rec_te":0.0,"fgm_yds":0.0,"def_forced_punts":0.0,"bonus_rec_yd_100":0.0,"bonus_rush_yd_100":0.0,"pass_int":-2.0,"fgmiss_50p":0.0,"pts_allow_0":5.0,"bonus_pass_yd_400":0.0,"pass_2pt":2.0,"rec_0_4":0.0,"yds_allow_450_499":-5.0,"blk_kick_ret_yd":0.0,"st_td":6.0,"def_pr_yd":0.0,"rec_30_39":0.0,"sack_yd":0.0,"fgm_yds_over_30":0.0,"rec_td":6.0,"yds_allow_400_449":-3.0,"tkl_ast":0.0,"rec_20_29":0.0,"fgm_30_39":3.0,"fgm_50_59":5.0,"xpmiss":0.0,"rush_td_50p":0.0,"rush_td":6.0,"def_kr_yd":0.0,"bonus_fd_wr":0.0,"pts_allow":0.0,"def_4_and_stop":0.0,"fg_ret_yd":0.0,"yds_allow_550p":-7.0,"pass_td_40p":0.0,"def_st_tkl_solo":0.0,"yds_allow_350_399":-1.0,"fgm":0.0,"idp_sack_yd":0.0,"bonus_rush_rec_yd_100":0.0,"rec_2pt":2.0,"bonus_pass_cmp_25":0.0,"rush_fd":0.0,"pass_int_td":0.0,"int_ret_yd":0.0,"pass_att":0.0,"st_fum_rec":1.0,"fgmiss":-1.0,"bonus_def_fum_td_50p":0.0,"ff":1.0,"bonus_sack_2p":0.0,"fgmiss_30_39":0.0,"rec":1.0,"yds_allow_200_299":2.0,"pts_allow_14_20":1.0,"def_2pt":0.0,"fgm_0_19":3.0,"idp_pass_def_3p":0.0,"int":2.0,"def_st_fum_rec":1.0,"fum_lost":-2.0,"pts_allow_1_6":4.0,"rec_fd":0.0,"kr_yd":0.0,"fgm_60p":6.0,"fgmiss_20_29":0.0,"rush_att":0.0,"st_tkl_solo":0.0,"yds_allow":0.0,"rec_5_9":0.0,"fgm_20_29":3.0,"fgmiss_60p":0.0,"yds_allow_500_549":-6.0,"pts_allow_21_27":0.0,"bonus_rec_wr":0.0,"bonus_pass_yd_300":0.0,"xpm":1.0,"pass_td_50p":0.0,"pass_sack":0.0,"rec_40p":0.0,"def_3_and_out":0.0,"fgmiss_50_59":0.0,"fgmiss_0_19":0.0,"pass_cmp":0.0,"tkl_loss":0.0,"rush_2pt":2.0,"def_pass_def":0.0,"yds_allow_300_349":0.0,"fum_rec":2.0,"rec_10_19":0.0,"bonus_rec_yd_200":0.0,"def_st_td":6.0,"tkl":0.0,"pass_cmp_40p":0.0,"fgm_50p":0.0,"bonus_tkl_10p":0.0,"def_td":6.0,"pass_fd":0.0,"rec_td_40p":0.0,"bonus_rush_yd_200":0.0,"safe":2.0,"pass_yd":0.04,"fgmiss_40_49":0.0,"rec_td_50p":0.0,"blk_kick":2.0,"pass_td":4.0,"tkl_solo":0.0,"bonus_rush_att_20":0.0,"yds_allow_100_199":3.0,"bonus_def_int_td_50p":0.0,"bonus_fd_qb":0.0,"rush_yd":0.1,"yds_allow_0_100":5.0,"bonus_rec_rb":0.0,"rush_40p":0.0,"pr_yd":0.0,"fum":0.0,"pts_allow_28_34":-1.0,"pts_allow_35p":-4.0,"bonus_rush_rec_yd_200":0.0,"fum_rec_td":6.0,"rec_yd":0.1,"rush_td_40p":0.0,"bonus_fd_te":0.0,"bonus_fd_rb":0.0,"fum_ret_yd":0.0,"def_st_ff":1.0,"pass_inc":0.0,"pts_allow_7_13":3.0,"st_ff":1.0}},"oops":{"id":"1389754735367589888","scoring":{"sack":1.0,"qb_hit":0.0,"fgm_40_49":4.0,"bonus_rec_te":0.0,"fgm_yds":0.0,"def_forced_punts":0.0,"bonus_rec_yd_100":0.0,"bonus_rush_yd_100":0.0,"pass_int":-2.0,"fgmiss_50p":0.0,"pts_allow_0":5.0,"bonus_pass_yd_400":0.0,"pass_2pt":2.0,"rec_0_4":0.0,"yds_allow_450_499":-5.0,"blk_kick_ret_yd":0.0,"st_td":6.0,"def_pr_yd":0.0,"rec_30_39":0.0,"sack_yd":0.0,"fgm_yds_over_30":0.0,"rec_td":6.0,"yds_allow_400_449":-3.0,"tkl_ast":0.0,"rec_20_29":0.0,"fgm_30_39":3.0,"fgm_50_59":5.0,"xpmiss":-1.0,"rush_td_50p":0.0,"rush_td":6.0,"def_kr_yd":0.0,"bonus_fd_wr":0.0,"pts_allow":0.0,"def_4_and_stop":0.0,"fg_ret_yd":0.0,"yds_allow_550p":-7.0,"pass_td_40p":0.0,"def_st_tkl_solo":0.0,"yds_allow_350_399":-1.0,"fgm":0.0,"idp_sack_yd":0.0,"bonus_rush_rec_yd_100":0.0,"rec_2pt":2.0,"bonus_pass_cmp_25":0.0,"rush_fd":0.0,"pass_int_td":0.0,"int_ret_yd":0.0,"pass_att":0.0,"st_fum_rec":1.0,"fgmiss":-1.0,"bonus_def_fum_td_50p":0.0,"ff":1.0,"bonus_sack_2p":0.0,"fgmiss_30_39":0.0,"rec":1.0,"yds_allow_200_299":2.0,"pts_allow_14_20":1.0,"def_2pt":0.0,"fgm_0_19":3.0,"idp_pass_def_3p":0.0,"int":2.0,"def_st_fum_rec":1.0,"fum_lost":-2.0,"pts_allow_1_6":4.0,"rec_fd":0.0,"kr_yd":0.0,"fgm_60p":6.0,"fgmiss_20_29":0.0,"rush_att":0.0,"st_tkl_solo":0.0,"yds_allow":0.0,"rec_5_9":0.0,"fgm_20_29":3.0,"fgmiss_60p":0.0,"yds_allow_500_549":-6.0,"pts_allow_21_27":0.0,"bonus_rec_wr":0.0,"bonus_pass_yd_300":0.0,"xpm":1.0,"pass_td_50p":0.0,"pass_sack":0.0,"rec_40p":0.0,"def_3_and_out":0.0,"fgmiss_50_59":0.0,"fgmiss_0_19":0.0,"pass_cmp":0.0,"tkl_loss":0.0,"rush_2pt":2.0,"def_pass_def":0.0,"yds_allow_300_349":0.0,"fum_rec":2.0,"rec_10_19":0.0,"bonus_rec_yd_200":0.0,"def_st_td":6.0,"tkl":0.0,"pass_cmp_40p":0.0,"fgm_50p":0.0,"bonus_tkl_10p":0.0,"def_td":6.0,"pass_fd":0.0,"rec_td_40p":0.0,"bonus_rush_yd_200":0.0,"safe":2.0,"pass_yd":0.04,"fgmiss_40_49":0.0,"rec_td_50p":0.0,"blk_kick":2.0,"pass_td":4.0,"tkl_solo":0.0,"bonus_rush_att_20":0.0,"yds_allow_100_199":3.0,"bonus_def_int_td_50p":0.0,"bonus_fd_qb":0.0,"rush_yd":0.1,"yds_allow_0_100":5.0,"bonus_rec_rb":0.0,"rush_40p":0.0,"pr_yd":0.0,"fum":0.0,"pts_allow_28_34":-1.0,"pts_allow_35p":-4.0,"bonus_rush_rec_yd_200":0.0,"fum_rec_td":6.0,"rec_yd":0.1,"rush_td_40p":0.0,"bonus_fd_te":0.0,"bonus_fd_rb":0.0,"fum_ret_yd":0.0,"def_st_ff":1.0,"pass_inc":0.0,"pts_allow_7_13":3.0,"st_ff":1.0}},"spacex":{"id":"1398902725940367360","scoring":{"sack":1.0,"qb_hit":0.0,"fgm_40_49":4.0,"bonus_rec_te":0.0,"fgm_yds":0.0,"def_forced_punts":0.0,"bonus_rec_yd_100":0.0,"bonus_rush_yd_100":0.0,"pass_int":-2.0,"fgmiss_50p":0.0,"pts_allow_0":5.0,"bonus_pass_yd_400":0.0,"pass_2pt":2.0,"rec_0_4":0.0,"yds_allow_450_499":-5.0,"blk_kick_ret_yd":0.0,"st_td":6.0,"def_pr_yd":0.0,"rec_30_39":0.0,"sack_yd":0.0,"fgm_yds_over_30":0.0,"rec_td":6.0,"yds_allow_400_449":-3.0,"tkl_ast":0.0,"rec_20_29":0.0,"idp_blk_kick":0.0,"fgm_30_39":3.0,"fgm_50_59":5.0,"idp_fum_ret_yd":0.0,"xpmiss":-1.0,"rush_td_50p":0.0,"rush_td":6.0,"def_kr_yd":0.0,"bonus_fd_wr":0.0,"pts_allow":0.0,"def_4_and_stop":0.0,"fg_ret_yd":0.0,"idp_tkl":0.0,"yds_allow_550p":-7.0,"pass_td_40p":0.0,"def_st_tkl_solo":0.0,"yds_allow_350_399":-1.0,"fgm":0.0,"idp_sack_yd":0.0,"bonus_rush_rec_yd_100":0.0,"rec_2pt":2.0,"bonus_pass_cmp_25":0.0,"idp_tkl_loss":0.0,"rush_fd":0.0,"pass_int_td":0.0,"int_ret_yd":0.0,"idp_tkl_solo":0.0,"pass_att":0.0,"st_fum_rec":1.0,"fgmiss":-1.0,"bonus_def_fum_td_50p":0.0,"ff":1.0,"idp_int":0.0,"bonus_sack_2p":0.0,"fgmiss_30_39":0.0,"rec":1.0,"yds_allow_200_299":2.0,"idp_int_ret_yd":0.0,"idp_safe":0.0,"pts_allow_14_20":1.0,"def_2pt":0.0,"fgm_0_19":3.0,"idp_def_td":0.0,"idp_pass_def_3p":0.0,"int":2.0,"def_st_fum_rec":1.0,"fum_lost":-2.0,"pts_allow_1_6":4.0,"rec_fd":0.0,"kr_yd":0.0,"fgm_60p":6.0,"fgmiss_20_29":0.0,"rush_att":0.0,"st_tkl_solo":0.0,"yds_allow":0.0,"rec_5_9":0.0,"idp_sack":0.0,"fgm_20_29":3.0,"fgmiss_60p":0.0,"yds_allow_500_549":-6.0,"pts_allow_21_27":0.0,"bonus_rec_wr":0.0,"bonus_pass_yd_300":0.0,"xpm":1.0,"pass_td_50p":0.0,"pass_sack":0.0,"rec_40p":0.0,"def_3_and_out":0.0,"fgmiss_50_59":0.0,"fgmiss_0_19":0.0,"pass_cmp":0.0,"tkl_loss":0.0,"rush_2pt":2.0,"def_pass_def":0.0,"yds_allow_300_349":0.0,"fum_rec":2.0,"idp_pass_def":0.0,"bonus_rush_td_qb":0.0,"rec_10_19":0.0,"bonus_rec_yd_200":0.0,"def_st_td":6.0,"tkl":0.0,"pass_cmp_40p":0.0,"fgm_50p":0.0,"bonus_tkl_10p":0.0,"def_td":6.0,"idp_fum_rec":0.0,"pass_fd":0.0,"rec_td_40p":0.0,"bonus_rush_yd_200":0.0,"safe":2.0,"pass_yd":0.04,"fgmiss_40_49":0.0,"rec_td_50p":0.0,"blk_kick":2.0,"pass_td":4.0,"tkl_solo":0.0,"bonus_rush_att_20":0.0,"yds_allow_100_199":3.0,"bonus_def_int_td_50p":0.0,"idp_qb_hit":0.0,"bonus_fd_qb":0.0,"rush_yd":0.1,"yds_allow_0_100":5.0,"bonus_rec_rb":0.0,"rush_40p":0.0,"pr_yd":0.0,"fum":0.0,"pts_allow_28_34":-1.0,"pts_allow_35p":-4.0,"bonus_rush_rec_yd_200":0.0,"fum_rec_td":6.0,"rec_yd":0.1,"rush_td_40p":0.0,"bonus_fd_te":0.0,"bonus_fd_rb":0.0,"fum_ret_yd":0.0,"def_st_ff":1.0,"pass_inc":0.0,"pts_allow_7_13":3.0,"idp_ff":0.0,"st_ff":1.0,"idp_tkl_ast":0.0}}};
 var API="https://api.sleeper.app";
-var PROJ=API+"/projections/nfl/2026/7?season_type=regular&position%5B%5D=QB&position%5B%5D=RB&position%5B%5D=WR&position%5B%5D=TE&position%5B%5D=K&position%5B%5D=DEF";
+var REPO="thetruth456/fantasy-home",WORKFLOW="update.yml",REF="main",TOKEN_KEY="fh_gh_token";
+var FILES={best:"best-league-report.js",zbt:"zbt-report.js",oops:"oopsilons-report.js",spacex:"spacex-report.js"};
 var SKIP={Played:1,Bye:1,Out:1,IR:1};
+function metaOf(k){var D=window.REPORTS&&window.REPORTS[k];return D&&D.META||null}
+function projUrl(m){return API+"/projections/nfl/"+m.season+"/"+m.week+"?season_type="+(m.season_type||"regular")+"&position%5B%5D=QB&position%5B%5D=RB&position%5B%5D=WR&position%5B%5D=TE&position%5B%5D=K&position%5B%5D=DEF"}
 var btn=document.getElementById("refresh-btn"),st=document.getElementById("refresh-status");
 if(!btn||!st)return;
 function getJSON(url,ms){var c=new AbortController(),t=setTimeout(function(){c.abort()},ms||25000);
@@ -19,10 +21,11 @@ function setStatus(msg,cls){st.textContent=msg;st.className="refresh-status"+(cl
 btn.addEventListener("click",function(){
 if(btn.disabled)return;
 btn.disabled=true;btn.setAttribute("aria-busy","true");btn.classList.add("loading");btn.querySelector(".lbl").textContent="Refreshing\u2026";setStatus("Fetching Sleeper projections\u2026","busy");
-var keys=Object.keys(window.REPORTS||{}).filter(function(k){return LEAGUES[k]});
+var keys=Object.keys(window.REPORTS||{}).filter(function(k){return metaOf(k)&&metaOf(k).league_id});
+if(!keys.length){setStatus("No report data loaded yet.","err");btn.disabled=false;btn.classList.remove("loading");btn.querySelector(".lbl").textContent="Refresh Sleeper projections";return}
 var scoring={};
-var projP=getJSON(PROJ,40000);
-var leaguesP=Promise.all(keys.map(function(k){return getJSON(API+"/v1/league/"+LEAGUES[k].id,15000).then(function(L){scoring[k]=(L&&L.scoring_settings&&Object.keys(L.scoring_settings).length)?L.scoring_settings:LEAGUES[k].scoring},function(){scoring[k]=LEAGUES[k].scoring})}));
+var projP=getJSON(projUrl(metaOf(keys[0])),40000);
+var leaguesP=Promise.all(keys.map(function(k){return getJSON(API+"/v1/league/"+metaOf(k).league_id,15000).then(function(L){scoring[k]=(L&&L.scoring_settings&&Object.keys(L.scoring_settings).length)?L.scoring_settings:metaOf(k).scoring},function(){scoring[k]=metaOf(k).scoring})}));
 Promise.all([projP,leaguesP]).then(function(r){
 var list=r[0];if(!Array.isArray(list)||list.length<100)throw new Error("unexpected projection data");
 var by={};list.forEach(function(x){if(x&&x.player_id&&x.stats)by[x.player_id]=x.stats});
@@ -40,4 +43,79 @@ setStatus("Sleeper proj refreshed "+ptNow()+" \u00b7 "+changed+" of "+updated+" 
 setStatus("Couldn\u2019t refresh Sleeper projections ("+(e&&e.name==="AbortError"?"timed out":(e&&e.message)||"network error")+"). Showing the snapshot values.","err")
 }).then(function(){btn.disabled=false;btn.removeAttribute("aria-busy");btn.classList.remove("loading");btn.querySelector(".lbl").textContent="Refresh Sleeper projections"});
 });
+
+/* ---- Refresh everything: dispatch the GitHub Actions update workflow, wait for it, then re-read the data files ---- */
+var fbtn=document.getElementById("full-btn"),panel=document.getElementById("token-panel"),form=document.getElementById("token-form"),
+input=document.getElementById("token-input"),cancel=document.getElementById("token-cancel"),tmsg=document.getElementById("token-msg"),clr=document.getElementById("token-clear");
+if(!fbtn)return;
+function tok(){try{return localStorage.getItem(TOKEN_KEY)||""}catch(e){return""}}
+function setTok(v){try{if(v)localStorage.setItem(TOKEN_KEY,v);else localStorage.removeItem(TOKEN_KEY)}catch(e){}syncClear()}
+function syncClear(){if(clr)clr.hidden=!tok()}
+function openPanel(m){if(!panel)return;tmsg.textContent=m||"";panel.hidden=false;input.value="";input.focus()}
+function closePanel(){if(panel)panel.hidden=true}
+function ptFmt(d){try{var f=new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).formatToParts(d),o={};f.forEach(function(p){o[p.type]=p.value});return o.month+" "+o.day+", "+o.hour+":"+o.minute+" "+o.dayPeriod+" PT"}catch(e){return d.toLocaleString()}}
+function sleep(ms){return new Promise(function(r){setTimeout(r,ms)})}
+function gh(path,o){o=o||{};var h={Accept:o.accept||"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"};
+if(tok())h.Authorization="Bearer "+tok();if(o.body)h["Content-Type"]="application/json";
+return fetch("https://api.github.com"+path,{method:o.method||"GET",headers:h,body:o.body,cache:"no-store"})}
+function ghError(r,what){var e=new Error("");e.code=r.status;
+var left=r.headers.get("x-ratelimit-remaining"),reset=r.headers.get("x-ratelimit-reset");
+if(r.status===401){e.message="GitHub rejected the token (wrong or expired). Paste a new one.";e.badToken=true}
+else if(r.status===429||(r.status===403&&left==="0")){e.message="GitHub rate limit reached"+(reset?"; try again after "+ptFmt(new Date(reset*1000)):"; try again in a few minutes")+"."}
+else if(r.status===403){e.message="The token isn\u2019t allowed to start workflows. It needs Actions: Read and write on the fantasy-home repo.";e.badToken=true}
+else if(r.status===404){e.message="GitHub says "+what+" wasn\u2019t found. Check the token has access to fantasy-home and that .github/workflows/"+WORKFLOW+" is on "+REF+".";e.badToken=true}
+else if(r.status===422){e.message="GitHub couldn\u2019t start the workflow. Check that "+WORKFLOW+" has a workflow_dispatch trigger on "+REF+"."}
+else e.message="GitHub returned HTTP "+r.status+".";
+return e}
+function ok(r,what){return r.ok?r:Promise.reject(ghError(r,what))}
+function parseData(text,key){var i=text.indexOf("{",text.indexOf("REPORTS."+key+"="));if(i<0)throw new Error("unexpected data file");return JSON.parse(text.slice(i,text.lastIndexOf("}")+1))}
+function loadData(key){/* repo contents API first (fresh, no Pages deploy lag), then the site's own copy */
+var f=FILES[key];
+return gh("/repos/"+REPO+"/contents/"+f+"?ref="+REF,{accept:"application/vnd.github.raw+json"}).then(function(r){if(!r.ok)throw 0;return r.text()})
+.catch(function(){return fetch(f+"?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.text()})})
+.then(function(t){return parseData(t,key)})}
+function fbusy(on){fbtn.disabled=on;btn.disabled=on;fbtn.classList.toggle("loading",on);if(on)fbtn.setAttribute("aria-busy","true");else fbtn.removeAttribute("aria-busy");fbtn.querySelector(".lbl").textContent=on?"Refreshing everything\u2026":"Refresh everything"}
+function fullRefresh(){
+if(fbtn.disabled)return;
+if(!tok()){openPanel("");return}
+closePanel();fbusy(true);setStatus("Asking GitHub to refresh everything\u2026","busy");
+var t0=Date.now(),secs=function(){return " ("+Math.round((Date.now()-t0)/1000)+"s)"};
+var keys=Object.keys(FILES).filter(function(k){return metaOf(k)});
+var base={};keys.forEach(function(k){base[k]=metaOf(k).generated||""});
+var baseId=0,runId=0;
+gh("/repos/"+REPO+"/actions/workflows/"+WORKFLOW+"/runs?event=workflow_dispatch&per_page=1").then(function(r){return ok(r,"the workflow")}).then(function(r){return r.json()})
+.then(function(j){baseId=(j.workflow_runs&&j.workflow_runs[0]&&j.workflow_runs[0].id)||0})
+.then(function(){return gh("/repos/"+REPO+"/actions/workflows/"+WORKFLOW+"/dispatches",{method:"POST",body:JSON.stringify({ref:REF,inputs:{force:"true"}})})})
+.then(function(r){return ok(r,"the workflow")})
+.then(function(){
+function poll(){
+if(Date.now()-t0>15*60*1000)throw new Error("The update is taking longer than expected. Check the Actions tab on GitHub.");
+return sleep(5000).then(function(){return gh("/repos/"+REPO+"/actions/workflows/"+WORKFLOW+"/runs?event=workflow_dispatch&per_page=5")}).then(function(r){return ok(r,"the workflow runs")}).then(function(r){return r.json()}).then(function(j){
+var run=(j.workflow_runs||[]).filter(function(x){return x.id>baseId})[0];
+if(!run){if(Date.now()-t0>90000)throw new Error("GitHub didn\u2019t start the workflow. Check the Actions tab.");setStatus("Waiting for GitHub to start the update\u2026"+secs(),"busy");return poll()}
+runId=run.id;
+if(run.status!=="completed"){setStatus((run.status==="queued"?"Queued on GitHub\u2026":"Updating data on GitHub\u2026")+secs(),"busy");return poll()}
+if(run.conclusion!=="success"){var e=new Error("The update run finished with \u201c"+run.conclusion+"\u201d. See "+run.html_url);e.runUrl=run.html_url;throw e}
+return run})}
+return poll()})
+.then(function(){setStatus("Loading the new data\u2026","busy");
+return Promise.all(keys.map(function(k){return loadData(k).then(function(d){return[k,d]})}))})
+.then(function(res){var latest="";
+res.forEach(function(x){window.REPORTS[x[0]]=x[1];var g=(x[1].META&&x[1].META.generated)||"";if(g>latest)latest=g});
+res.forEach(function(x){if(window.REDRAW&&window.REDRAW[x[0]])window.REDRAW[x[0]]()});
+var stale=res.every(function(x){return (x[1].META.generated||"")<=base[x[0]]});
+setStatus("Full refresh done, data as of "+(latest?ptFmt(new Date(latest)):ptNow())+(stale?" (the workflow found nothing newer)":""),"ok")})
+.catch(function(e){
+var m=(e&&e.message)||"network error";
+if(e&&e.name==="TypeError")m="Couldn\u2019t reach GitHub. Check your connection and try again.";
+setStatus("Full refresh failed: "+m,"err");
+if(e&&e.badToken){setTok("");openPanel(m)}})
+.then(function(){fbusy(false)})}
+fbtn.addEventListener("click",fullRefresh);
+if(form)form.addEventListener("submit",function(ev){ev.preventDefault();var v=(input.value||"").trim();
+if(!/^[A-Za-z0-9_]{20,}$/.test(v)){tmsg.textContent="That doesn\u2019t look like a GitHub token (it should start with github_pat_).";return}
+setTok(v);input.value="";closePanel();fullRefresh()});
+if(cancel)cancel.addEventListener("click",closePanel);
+if(clr)clr.addEventListener("click",function(){setTok("");closePanel();setStatus("GitHub token removed from this browser.","")});
+syncClear();
 })();

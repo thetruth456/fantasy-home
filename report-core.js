@@ -17,11 +17,11 @@ var cells=[esc(it.label),esc(p.name+" \u00b7 "+p.team),esc(p.pos),esc(p.opp),pp,
 h+="<tr>"+cells.map(function(c){return"<td>"+c+"</td>"}).join("")+"</tr>"});
 return h+"</tbody></table>"}
 window.initReport=function(key){
-var D=window.REPORTS[key],STARTERS=D.STARTERS,BENCH=D.BENCH,WAIVER=D.WAIVER;
+function D(){return window.REPORTS[key]}
 function $(id){return document.getElementById(key+"-"+id)}
 function lab(s){return SLOT[s]||s}
 var view="Flex candidates",sort="Prop-implied pts";
-function flexItems(){var all=[];STARTERS.forEach(function(p){if(p.pos==="RB"||p.pos==="WR"||p.pos==="TE")all.push({it:{p:p,label:p.slot==="FLEX"?"Current FLEX":"Starter "+lab(p.slot)},cand:p.slot==="FLEX"})});
+function flexItems(){var all=[],STARTERS=D().STARTERS,BENCH=D().BENCH,WAIVER=D().WAIVER;STARTERS.forEach(function(p){if(p.pos==="RB"||p.pos==="WR"||p.pos==="TE")all.push({it:{p:p,label:p.slot==="FLEX"?"Current FLEX":"Starter "+lab(p.slot)},cand:p.slot==="FLEX"})});
 BENCH.forEach(function(p){if(p.pn>0)all.push({it:{p:p,label:"Bench"},cand:true})});
 WAIVER.forEach(function(p){all.push({it:{p:p,label:"FA"},cand:true})});
 var rows=all.filter(function(x){return view==="All skill players"||x.cand}).map(function(x){return x.it});
@@ -32,7 +32,14 @@ function render(){
 seg("seg-view",["Flex candidates","All skill players"],function(){return view},function(v){view=v});
 seg("seg-sort",["Prop-implied pts","Sleeper proj","Rec line"],function(){return sort},function(v){sort=v});
 $("t-flex").innerHTML=table(flexItems())}
-function draw(){
+function text(){var M=D().META;if(!M)return;
+function set(id,t){var e=$(id);if(e)e.textContent=t}
+function list(id,items){var e=$(id);if(!e)return;e.innerHTML="";items.forEach(function(t){var li=document.createElement("li");li.textContent=t;e.appendChild(li)})}
+set("title",M.title);set("asof",M.asof);set("wcap",M.wcap);set("week","Week "+M.week+" (latest)");
+list("quick",M.quick||[]);list("notes",M.notes||[]);
+var dl=$("setup");if(dl){dl.innerHTML="";(M.setup||[]).forEach(function(r){var dt=document.createElement("dt"),dd=document.createElement("dd");dt.textContent=r[0];if(r[2]){dd.innerHTML=pill(r[1],"accent")}else dd.textContent=r[1];dl.appendChild(dt);dl.appendChild(dd)})}
+if(document.body.getAttribute("data-report")===key)document.title=M.title}
+function draw(){var d=D(),STARTERS=d.STARTERS,BENCH=d.BENCH,WAIVER=d.WAIVER;text();
 $("t-starters").innerHTML=table(STARTERS.map(function(p){return{p:p,label:lab(p.slot)}}));
 $("t-bench").innerHTML=table(BENCH.slice().sort(byPP).map(function(p){return{p:p,label:"Bench"}}));
 $("t-waiver").innerHTML=table(WAIVER.slice().sort(byPP).map(function(p){return{p:p,label:"FA"}}));

@@ -9,20 +9,15 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="style.css">
 </head><body class="theme-best" id="body">
-<header class="site"><div class="in"><a class="brand" href="index.html"><img src="favicon.svg" alt="" width="30" height="30"><span>Fantasy <b>home base</b></span></a><nav class="tabs" role="tablist" aria-label="Leagues"><button type="button" role="tab" data-p="best" class="theme-best" data-theme="theme-best" aria-selected="true" aria-controls="p-best">Best League</button><button type="button" role="tab" data-p="zbt" class="theme-zbt" data-theme="theme-zbt" aria-selected="false" aria-controls="p-zbt">ZBT</button><button type="button" role="tab" data-p="oops" class="theme-oops" data-theme="theme-oops" aria-selected="false" aria-controls="p-oops">Oopsilons</button><button type="button" role="tab" data-p="spacex" class="theme-spacex" data-theme="theme-spacex" aria-selected="false" aria-controls="p-spacex">SpaceX FF</button></nav><div class="refresh"><button type="button" id="refresh-btn" class="refresh-btn"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lbl">Refresh Sleeper projections</span></button><span id="refresh-status" class="refresh-status" role="status" aria-live="polite">Showing snapshot (props and FantasyPros ranks are fixed)</span></div></div></header>
+<header class="site"><div class="in"><a class="brand" href="index.html"><img src="favicon.svg" alt="" width="30" height="30"><span>Fantasy <b>home base</b></span></a><nav class="tabs" role="tablist" aria-label="Leagues"><button type="button" role="tab" data-p="best" class="theme-best" data-theme="theme-best" aria-selected="true" aria-controls="p-best">Best League</button><button type="button" role="tab" data-p="zbt" class="theme-zbt" data-theme="theme-zbt" aria-selected="false" aria-controls="p-zbt">ZBT</button><button type="button" role="tab" data-p="oops" class="theme-oops" data-theme="theme-oops" aria-selected="false" aria-controls="p-oops">Oopsilons</button><button type="button" role="tab" data-p="spacex" class="theme-spacex" data-theme="theme-spacex" aria-selected="false" aria-controls="p-spacex">SpaceX FF</button></nav><div class="refresh"><div class="rbtns"><button type="button" id="refresh-btn" class="refresh-btn"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lbl">Refresh Sleeper projections</span></button><button type="button" id="full-btn" class="refresh-btn full" title="Re-pulls everything (rosters, projections, props, FantasyPros) through GitHub Actions"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3v9m0 0 3.5-3.5M12 12 8.5 8.5M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lbl">Refresh everything</span></button></div><span id="refresh-status" class="refresh-status" role="status" aria-live="polite">Showing snapshot (props and FantasyPros ranks update on a schedule)</span><button type="button" id="token-clear" class="linkbtn" hidden>Forget GitHub token</button></div></div><div id="token-panel" class="token-panel" hidden><div class="tin"><strong>One-time setup for “Refresh everything”</strong><ol><li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub: new fine-grained token</a>, name it anything and pick an expiry.</li><li>Repository access: <b>Only select repositories</b>, then <b>fantasy-home</b>.</li><li>Permissions, Repository permissions: <b>Actions: Read and write</b>. Nothing else. Click Generate token.</li><li>Paste the token below. It is saved only in this browser (localStorage), never in the repo.</li></ol><form id="token-form" autocomplete="off"><input type="password" id="token-input" placeholder="github_pat_…" aria-label="GitHub token" autocomplete="off" spellcheck="false"><button type="submit" class="refresh-btn">Save and refresh</button><button type="button" id="token-cancel" class="linkbtn">Cancel</button></form><p id="token-msg" class="token-msg" role="alert"></p></div></div></header>
 <div class="wrap">
 <div class="panel theme-best" id="p-best" role="tabpanel">
-<p class="weekline">Weekly snapshots: <a href="best-league.html">Week 7 (latest)</a> <span class="sep">|</span> <a href="best-league.html">Standalone page</a></p>
-<h1>Best League Week 7: roster, waiver flex options and prop tiebreakers</h1>
-<p class="asof">Props as of Oct 24, 10:26 PM ET (Oct 25, 02:26 UTC); Sleeper projections as of Oct 25, 03:10 UTC; FantasyPros ranks as of Oct 25, 03:30 UTC.</p>
+<p class="weekline">Weekly snapshots: <a href="best-league.html" id="best-week">Latest week</a> <span class="sep">|</span> <a href="best-league.html">Standalone page</a></p>
+<h1 id="best-title"></h1>
+<p class="asof" id="best-asof"></p>
 
 <section class="quick"><h2>Quick read (suggestion only)</h2>
-<ul>
-<li>Your FLEX is RJ Harvey (RB DEN at ARI, 9.4 proj, 9.2 prop-implied, Sunday).</li>
-<li>Free agent Dallas Goedert (TE PHI vs DAL, 9.6 proj, 12.4) is ahead of him on both projection and props, but plays Monday night.</li>
-<li>Next on props: T.J. Hockenson (TE MIN, 7.9 proj, 9.8), Makai Lemon (WR PHI, 6.9 proj, 9.3) and Cade Otton (TE TB, 6.5 proj, 9.4). The best bench option is Caleb Douglas (WR MIA, 6.2 proj, 7.0).</li>
-<li>D'Andre Swift (17.0) and A.J. Brown (6.3) already played Thursday. Rashee Rice and Brian Robinson Jr. are Out on your bench, Davante Adams is on IR, and Trevor Lawrence and Brian Thomas Jr. are on bye.</li>
-</ul></section>
+<ul id="best-quick"></ul></section>
 
 <section id="best-flex-tiebreaker"><h2>Flex tiebreaker</h2>
 <p class="cap">Color in the Prop-implied pts column is relative to the rows shown: top third green, middle third yellow, bottom third red. The number in parentheses after Sleeper proj is prop-implied minus projection. FP rank is the FantasyPros weekly consensus rank: flex ranking for RB, WR and TE (half PPR for Best League, PPR for the others), and position rank for QB, K and DEF. Color in the FP rank column is relative to the rows shown (lower rank is better): top third green, middle third yellow, bottom third red; position ranks and dashes are not colored. A dash means unranked.</p>
@@ -38,41 +33,21 @@
 <div class="scroll" id="best-t-bench"></div></section>
 
 <section id="best-waivers"><h2>Waiver flex options</h2>
-<p class="cap">The ten highest-projected unrostered RB, WR and TE (Sleeper projection under this league's scoring), sorted by prop-implied points. The top ten included 1 RB and 4 WRs, so the list was extended to 11 players to include at least 2 RBs and 2 WRs.</p>
+<p class="cap" id="best-wcap"></p>
 <div class="scroll" id="best-t-waiver"></div></section>
 
 <section id="best-league-setup"><h2>League setup</h2>
-<dl>
-<dt>League</dt><dd>Best League, 12 teams, 2026 season, Week 7</dd>
-<dt>Scoring</dt><dd><span class="pill accent">Half PPR</span></dd>
-<dt>Reception / yards</dt><dd>0.5 per reception, 0.1 per rushing or receiving yard, 6 per TD</dd>
-<dt>Passing</dt><dd>0.04 per yard, 4 per TD, -2 per interception</dd>
-<dt>Other</dt><dd>-2 per fumble lost, 2 per 2-point conversion, no TE premium, no yardage bonuses</dd>
-<dt>Kicker</dt><dd>0.5 per extra point; field goals 1.5 (under 40 yards), 2.0 (40-49), 2.5 (50+)</dd>
-<dt>Defense / ST</dt><dd>1 per sack, 2 per interception, 2 per fumble recovery, 2 per safety, 6 per TD; points allowed: 0 = +10, 1-6 = +7, 7-13 = +4, 14-20 = +1, 21-27 = 0, 28-34 = -1, 35+ = -4</dd>
-<dt>Starting slots</dt><dd>QB, RB, RB, WR, WR, TE, FLEX (RB, WR or TE), K, DEF</dd>
-<dt>Bench</dt><dd>6 bench spots and 1 IR spot</dd>
-<dt>Your record</dt><dd>4-2, 4th of 12; Week 7 opponent zackgordon</dd>
-</dl></section>
+<dl id="best-setup"></dl></section>
 
 <section id="best-data-notes"><h2>Data notes and sources</h2>
-<ul>
-<li>Projections: Sleeper (Rotowire feed) re-scored to this league's settings.</li>
-<li>Props: Fieldwork (DraftKings, FanDuel, BetMGM, BetRivers), cross-checked with Sharp Football Analysis and EVAnalytics. A dash means no line was posted.</li>
-<li>Lines can move before kickoff; re-check before lock.</li>
-</ul></section></div>
+<ul id="best-notes"></ul></section></div>
 <div class="panel theme-zbt" id="p-zbt" role="tabpanel" hidden>
-<p class="weekline">Weekly snapshots: <a href="zbt.html">Week 7 (latest)</a> <span class="sep">|</span> <a href="zbt.html">Standalone page</a></p>
-<h1>ZBT Week 7: roster, waiver flex options and prop tiebreakers</h1>
-<p class="asof">Props as of Oct 24, 9:31 PM ET (Oct 25, 01:31 UTC); Sleeper projections as of Oct 25, 01:30 UTC; FantasyPros ranks as of Oct 25, 03:30 UTC.</p>
+<p class="weekline">Weekly snapshots: <a href="zbt.html" id="zbt-week">Latest week</a> <span class="sep">|</span> <a href="zbt.html">Standalone page</a></p>
+<h1 id="zbt-title"></h1>
+<p class="asof" id="zbt-asof"></p>
 
 <section class="quick"><h2>Quick read (suggestion only)</h2>
-<ul>
-<li>Your FLEX is Ryan Flournoy (7.0 proj, 8.1 prop-implied, Monday night).</li>
-<li>On props he is level with free agents Juwan Johnson (TE NO, 10.3 proj, 8.1) and Dalton Schultz (TE HOU, 8.5 proj, 8.1); Johnson has the clearly better projection.</li>
-<li>Ted Hurst III (WR TB at CAR) is next at 7.8.</li>
-<li>Barkley is Questionable for Monday night.</li>
-</ul></section>
+<ul id="zbt-quick"></ul></section>
 
 <section id="zbt-flex-tiebreaker"><h2>Flex tiebreaker</h2>
 <p class="cap">Color in the Prop-implied pts column is relative to the rows shown: top third green, middle third yellow, bottom third red. The number in parentheses after Sleeper proj is prop-implied minus projection. FP rank is the FantasyPros weekly consensus rank: flex ranking for RB, WR and TE (half PPR for Best League, PPR for the others), and position rank for QB, K and DEF. Color in the FP rank column is relative to the rows shown (lower rank is better): top third green, middle third yellow, bottom third red; position ranks and dashes are not colored. A dash means unranked.</p>
@@ -88,39 +63,21 @@
 <div class="scroll" id="zbt-t-bench"></div></section>
 
 <section id="zbt-waivers"><h2>Waiver flex options</h2>
-<p class="cap">The ten highest-projected unrostered RB, WR and TE (Sleeper projection under this league's scoring), sorted by prop-implied points. The top ten already include 3 WRs and 2 RBs, so the list was not extended.</p>
+<p class="cap" id="zbt-wcap"></p>
 <div class="scroll" id="zbt-t-waiver"></div></section>
 
 <section id="zbt-league-setup"><h2>League setup</h2>
-<dl>
-<dt>League</dt><dd>ZBT, 14 teams, 2026 season, Week 7</dd>
-<dt>Scoring</dt><dd><span class="pill accent">Full PPR</span></dd>
-<dt>Reception / yards</dt><dd>1.0 per reception, 0.1 per rushing or receiving yard, 6 per TD</dd>
-<dt>Passing</dt><dd>0.04 per yard, 4 per TD, -2 per interception</dd>
-<dt>Other</dt><dd>-2 per fumble lost, no TE premium, no yardage bonuses, K and DEF score as standard</dd>
-<dt>Starting slots</dt><dd>QB, RB, RB, WR, WR, TE, FLEX (RB, WR or TE), K, DEF</dd>
-<dt>Bench</dt><dd>6 bench spots and 1 IR spot</dd>
-<dt>Your record</dt><dd>4-2, 4th of 14; Week 7 opponent keegs23</dd>
-</dl></section>
+<dl id="zbt-setup"></dl></section>
 
 <section id="zbt-data-notes"><h2>Data notes and sources</h2>
-<ul>
-<li>Projections: Sleeper (Rotowire feed) re-scored to this league's settings.</li>
-<li>Props: Fieldwork (DraftKings, FanDuel, BetMGM, BetRivers), cross-checked with Sharp Football Analysis and EVAnalytics. A dash means no line was posted.</li>
-<li>Lines can move before kickoff; re-check before lock.</li>
-</ul></section></div>
+<ul id="zbt-notes"></ul></section></div>
 <div class="panel theme-oops" id="p-oops" role="tabpanel" hidden>
-<p class="weekline">Weekly snapshots: <a href="oopsilons.html">Week 7 (latest)</a> <span class="sep">|</span> <a href="oopsilons.html">Standalone page</a></p>
-<h1>Oopsilons Week 7: roster, waiver flex options and prop tiebreakers</h1>
-<p class="asof">Props as of Oct 24, 10:26 PM ET (Oct 25, 02:26 UTC); Sleeper projections as of Oct 25, 03:10 UTC; FantasyPros ranks as of Oct 25, 03:30 UTC.</p>
+<p class="weekline">Weekly snapshots: <a href="oopsilons.html" id="oops-week">Latest week</a> <span class="sep">|</span> <a href="oopsilons.html">Standalone page</a></p>
+<h1 id="oops-title"></h1>
+<p class="asof" id="oops-asof"></p>
 
 <section class="quick"><h2>Quick read (suggestion only)</h2>
-<ul>
-<li>Your FLEX is Aaron Jones (RB MIN vs IND, 12.7 proj, 10.4 prop-implied, Sunday).</li>
-<li>On props he is close to bench WR Josh Downs (IND at MIN, 9.2 proj, 10.9), but Jones has the clearly better projection.</li>
-<li>No free agent beats Jones on both measures: Makai Lemon (WR PHI, 8.9 proj, 9.3) and Darius Cooper (WR PHI, 9.6 proj, 9.2) are the best on props, and both play Monday night.</li>
-<li>Rashee Rice, Lamar Jackson and DeVonta Smith are Out on your bench, and Jordyn Tyson is on IR. Rico Dowdle (RB PIT) is Questionable on the waiver list.</li>
-</ul></section>
+<ul id="oops-quick"></ul></section>
 
 <section id="oops-flex-tiebreaker"><h2>Flex tiebreaker</h2>
 <p class="cap">Color in the Prop-implied pts column is relative to the rows shown: top third green, middle third yellow, bottom third red. The number in parentheses after Sleeper proj is prop-implied minus projection. FP rank is the FantasyPros weekly consensus rank: flex ranking for RB, WR and TE (half PPR for Best League, PPR for the others), and position rank for QB, K and DEF. Color in the FP rank column is relative to the rows shown (lower rank is better): top third green, middle third yellow, bottom third red; position ranks and dashes are not colored. A dash means unranked.</p>
@@ -136,41 +93,21 @@
 <div class="scroll" id="oops-t-bench"></div></section>
 
 <section id="oops-waivers"><h2>Waiver flex options</h2>
-<p class="cap">The ten highest-projected unrostered RB, WR and TE (Sleeper projection under this league's scoring), sorted by prop-implied points. The top ten already include 4 WRs and 2 RBs, so the list was not extended.</p>
+<p class="cap" id="oops-wcap"></p>
 <div class="scroll" id="oops-t-waiver"></div></section>
 
 <section id="oops-league-setup"><h2>League setup</h2>
-<dl>
-<dt>League</dt><dd>Oopsilons, 12 teams, 2026 season, Week 7</dd>
-<dt>Scoring</dt><dd><span class="pill accent">Full PPR</span></dd>
-<dt>Reception / yards</dt><dd>1.0 per reception, 0.1 per rushing or receiving yard, 6 per TD</dd>
-<dt>Passing</dt><dd>0.04 per yard, 4 per TD, -2 per interception</dd>
-<dt>Other</dt><dd>-2 per fumble lost, 2 per 2-point conversion, no TE premium, no yardage bonuses</dd>
-<dt>Kicker</dt><dd>1 per extra point (-1 miss); field goals 3 (under 40 yards), 4 (40-49), 5 (50-59), 6 (60+), -1 per miss</dd>
-<dt>Defense / ST</dt><dd>1 per sack, 2 per interception, 2 per fumble recovery, 1 per forced fumble, 2 per safety, 2 per blocked kick, 6 per TD; points allowed: 0 = +5, 1-6 = +4, 7-13 = +3, 14-20 = +1, 21-27 = 0, 28-34 = -1, 35+ = -4; yards allowed: under 100 = +5, 100-199 = +3, 200-299 = +2, 300-349 = 0, 350-399 = -1, 400-449 = -3, 450-499 = -5, 500-549 = -6, 550+ = -7</dd>
-<dt>Starting slots</dt><dd>QB, RB, RB, WR, WR, TE, FLEX (RB, WR or TE), K, DEF</dd>
-<dt>Bench</dt><dd>5 bench spots and 1 IR spot</dd>
-<dt>Your record</dt><dd>3-3, 7th of 12; Week 7 opponent Ezbot</dd>
-</dl></section>
+<dl id="oops-setup"></dl></section>
 
 <section id="oops-data-notes"><h2>Data notes and sources</h2>
-<ul>
-<li>Projections: Sleeper (Rotowire feed) re-scored to this league's settings.</li>
-<li>Props: Fieldwork (DraftKings, FanDuel, BetMGM, BetRivers), cross-checked with Sharp Football Analysis and EVAnalytics. A dash means no line was posted.</li>
-<li>Lines can move before kickoff; re-check before lock.</li>
-</ul></section></div>
+<ul id="oops-notes"></ul></section></div>
 <div class="panel theme-spacex" id="p-spacex" role="tabpanel" hidden>
-<p class="weekline">Weekly snapshots: <a href="spacex-ff.html">Week 7 (latest)</a> <span class="sep">|</span> <a href="spacex-ff.html">Standalone page</a></p>
-<h1>SpaceX FF 2026 Week 7: roster, waiver flex options and prop tiebreakers</h1>
-<p class="asof">Props as of Oct 24, 10:26 PM ET (Oct 25, 02:26 UTC); Sleeper projections as of Oct 25, 03:10 UTC; FantasyPros ranks as of Oct 25, 03:30 UTC.</p>
+<p class="weekline">Weekly snapshots: <a href="spacex-ff.html" id="spacex-week">Latest week</a> <span class="sep">|</span> <a href="spacex-ff.html">Standalone page</a></p>
+<h1 id="spacex-title"></h1>
+<p class="asof" id="spacex-asof"></p>
 
 <section class="quick"><h2>Quick read (suggestion only)</h2>
-<ul>
-<li>Your FLEX is RJ Harvey (RB DEN at ARI, 11.1 proj, 9.2 prop-implied, Sunday).</li>
-<li>Bench WR Chris Godwin Jr. (TB at CAR, 11.4 proj, 10.8) is ahead of him on both projection and props. J.K. Dobbins (RB DEN, 10.0 proj, 9.4) is level with Harvey on props but lower on projection.</li>
-<li>No free agent beats Harvey on both measures; Dalton Schultz (TE HOU, 8.5 proj, 8.1) and Cade Otton (TE TB, 8.4 proj, 9.4) are the closest.</li>
-<li>Breece Hall (RB2) is Questionable and has no rushing or receiving lines posted, so his prop-implied points show a dash. Jordyn Tyson is on IR.</li>
-</ul></section>
+<ul id="spacex-quick"></ul></section>
 
 <section id="spacex-flex-tiebreaker"><h2>Flex tiebreaker</h2>
 <p class="cap">Color in the Prop-implied pts column is relative to the rows shown: top third green, middle third yellow, bottom third red. The number in parentheses after Sleeper proj is prop-implied minus projection. FP rank is the FantasyPros weekly consensus rank: flex ranking for RB, WR and TE (half PPR for Best League, PPR for the others), and position rank for QB, K and DEF. Color in the FP rank column is relative to the rows shown (lower rank is better): top third green, middle third yellow, bottom third red; position ranks and dashes are not colored. A dash means unranked.</p>
@@ -186,30 +123,14 @@
 <div class="scroll" id="spacex-t-bench"></div></section>
 
 <section id="spacex-waivers"><h2>Waiver flex options</h2>
-<p class="cap">The ten highest-projected unrostered RB, WR and TE (Sleeper projection under this league's scoring), sorted by prop-implied points. The top ten already include 3 WRs and 2 RBs, so the list was not extended.</p>
+<p class="cap" id="spacex-wcap"></p>
 <div class="scroll" id="spacex-t-waiver"></div></section>
 
 <section id="spacex-league-setup"><h2>League setup</h2>
-<dl>
-<dt>League</dt><dd>SpaceX FF 2026, 12 teams, 2026 season, Week 7</dd>
-<dt>Scoring</dt><dd><span class="pill accent">Full PPR</span></dd>
-<dt>Reception / yards</dt><dd>1.0 per reception, 0.1 per rushing or receiving yard, 6 per TD</dd>
-<dt>Passing</dt><dd>0.04 per yard, 4 per TD, -2 per interception</dd>
-<dt>Other</dt><dd>-2 per fumble lost, 2 per 2-point conversion, no TE premium, no yardage bonuses</dd>
-<dt>Kicker</dt><dd>1 per extra point (-1 miss); field goals 3 (under 40 yards), 4 (40-49), 5 (50-59), 6 (60+), -1 per miss</dd>
-<dt>Defense / ST</dt><dd>1 per sack, 2 per interception, 2 per fumble recovery, 1 per forced fumble, 2 per safety, 2 per blocked kick, 6 per TD; points allowed: 0 = +5, 1-6 = +4, 7-13 = +3, 14-20 = +1, 21-27 = 0, 28-34 = -1, 35+ = -4; yards allowed: under 100 = +5, 100-199 = +3, 200-299 = +2, 300-349 = 0, 350-399 = -1, 400-449 = -3, 450-499 = -5, 500-549 = -6, 550+ = -7</dd>
-<dt>Starting slots</dt><dd>QB, RB, RB, WR, WR, TE, FLEX (RB, WR or TE), K, DEF</dd>
-<dt>Bench</dt><dd>7 bench spots and 1 IR spot</dd>
-<dt>Your record</dt><dd>2-4, 10th of 12; Week 7 opponent hb1277</dd>
-</dl></section>
+<dl id="spacex-setup"></dl></section>
 
 <section id="spacex-data-notes"><h2>Data notes and sources</h2>
-<ul>
-<li>Projections: Sleeper (Rotowire feed) re-scored to this league's settings.</li>
-<li>Props: Fieldwork (DraftKings, FanDuel, BetMGM, BetRivers), cross-checked with Sharp Football Analysis and EVAnalytics. A dash means no line was posted.</li>
-<li>Zonovan Knight's line is listed under "Bam Knight" at Fieldwork; his receiving-yards line is from EVAnalytics (Oct 23).</li>
-<li>Lines can move before kickoff; re-check before lock.</li>
-</ul></section></div>
+<ul id="spacex-notes"></ul></section></div>
 </div>
 <footer>Sleeper username: kfelder30</footer>
 <script src="report-core.js"></script>

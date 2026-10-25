@@ -1,0 +1,7 @@
+{
+  "_doc": "Manual prop fixes for ONE week only; ignored unless 'week' matches the current NFL week. fwname = name Fieldwork lists the player under; yn/rn/cn = receiving yards / rushing yards / receptions line to use when Fieldwork has none; note = extra line shown under Data notes.",
+  "week": 7,
+  "players": {
+    "Zonovan Knight": {"fwname": "Bam Knight", "yn": 6.5, "note": "Zonovan Knight's line is listed under \"Bam Knight\" at Fieldwork; his receiving-yards line is from EVAnalytics (Oct 23)."}
+  }
+}

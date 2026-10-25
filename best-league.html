@@ -2,27 +2,22 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0f6b3f">
-<title>Best League Week 7: roster, waiver flex options and prop tiebreakers</title>
+<title>Best League: roster, waiver flex options and prop tiebreakers</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="style.css">
-</head><body class="theme-best">
-<header class="site"><div class="in"><a class="brand" href="index.html"><img src="favicon.svg" alt="" width="30" height="30"><span>Fantasy <b>home base</b></span></a><nav class="tabs" aria-label="Leagues"><a href="best-league.html" aria-current="page" class="theme-best">Best League</a><a href="zbt.html" class="theme-zbt">ZBT</a><a href="oopsilons.html" class="theme-oops">Oopsilons</a><a href="spacex-ff.html" class="theme-spacex">SpaceX FF</a></nav><div class="refresh"><button type="button" id="refresh-btn" class="refresh-btn"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lbl">Refresh Sleeper projections</span></button><span id="refresh-status" class="refresh-status" role="status" aria-live="polite">Showing snapshot (props and FantasyPros ranks are fixed)</span></div></div></header>
+</head><body class="theme-best" data-report="best">
+<header class="site"><div class="in"><a class="brand" href="index.html"><img src="favicon.svg" alt="" width="30" height="30"><span>Fantasy <b>home base</b></span></a><nav class="tabs" aria-label="Leagues"><a href="best-league.html" aria-current="page" class="theme-best">Best League</a><a href="zbt.html" class="theme-zbt">ZBT</a><a href="oopsilons.html" class="theme-oops">Oopsilons</a><a href="spacex-ff.html" class="theme-spacex">SpaceX FF</a></nav><div class="refresh"><div class="rbtns"><button type="button" id="refresh-btn" class="refresh-btn"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lbl">Refresh Sleeper projections</span></button><button type="button" id="full-btn" class="refresh-btn full" title="Re-pulls everything (rosters, projections, props, FantasyPros) through GitHub Actions"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3v9m0 0 3.5-3.5M12 12 8.5 8.5M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lbl">Refresh everything</span></button></div><span id="refresh-status" class="refresh-status" role="status" aria-live="polite">Showing snapshot (props and FantasyPros ranks update on a schedule)</span><button type="button" id="token-clear" class="linkbtn" hidden>Forget GitHub token</button></div></div><div id="token-panel" class="token-panel" hidden><div class="tin"><strong>One-time setup for “Refresh everything”</strong><ol><li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub: new fine-grained token</a>, name it anything and pick an expiry.</li><li>Repository access: <b>Only select repositories</b>, then <b>fantasy-home</b>.</li><li>Permissions, Repository permissions: <b>Actions: Read and write</b>. Nothing else. Click Generate token.</li><li>Paste the token below. It is saved only in this browser (localStorage), never in the repo.</li></ol><form id="token-form" autocomplete="off"><input type="password" id="token-input" placeholder="github_pat_…" aria-label="GitHub token" autocomplete="off" spellcheck="false"><button type="submit" class="refresh-btn">Save and refresh</button><button type="button" id="token-cancel" class="linkbtn">Cancel</button></form><p id="token-msg" class="token-msg" role="alert"></p></div></div></header>
 <div class="wrap">
 <a class="back" href="index.html">&larr; Back to home</a>
-<p class="weekline">Weekly snapshots: <a href="best-league.html">Week 7 (latest)</a></p>
-<h1>Best League Week 7: roster, waiver flex options and prop tiebreakers</h1>
-<p class="asof">Props as of Oct 24, 10:26 PM ET (Oct 25, 02:26 UTC); Sleeper projections as of Oct 25, 03:10 UTC; FantasyPros ranks as of Oct 25, 03:30 UTC.</p>
+<p class="weekline">Weekly snapshots: <a href="best-league.html" id="best-week">Latest week</a></p>
+<h1 id="best-title"></h1>
+<p class="asof" id="best-asof"></p>
 
 <section class="quick"><h2>Quick read (suggestion only)</h2>
-<ul>
-<li>Your FLEX is RJ Harvey (RB DEN at ARI, 9.4 proj, 9.2 prop-implied, Sunday).</li>
-<li>Free agent Dallas Goedert (TE PHI vs DAL, 9.6 proj, 12.4) is ahead of him on both projection and props, but plays Monday night.</li>
-<li>Next on props: T.J. Hockenson (TE MIN, 7.9 proj, 9.8), Makai Lemon (WR PHI, 6.9 proj, 9.3) and Cade Otton (TE TB, 6.5 proj, 9.4). The best bench option is Caleb Douglas (WR MIA, 6.2 proj, 7.0).</li>
-<li>D'Andre Swift (17.0) and A.J. Brown (6.3) already played Thursday. Rashee Rice and Brian Robinson Jr. are Out on your bench, Davante Adams is on IR, and Trevor Lawrence and Brian Thomas Jr. are on bye.</li>
-</ul></section>
+<ul id="best-quick"></ul></section>
 
 <section id="best-flex-tiebreaker"><h2>Flex tiebreaker</h2>
 <p class="cap">Color in the Prop-implied pts column is relative to the rows shown: top third green, middle third yellow, bottom third red. The number in parentheses after Sleeper proj is prop-implied minus projection. FP rank is the FantasyPros weekly consensus rank: flex ranking for RB, WR and TE (half PPR for Best League, PPR for the others), and position rank for QB, K and DEF. Color in the FP rank column is relative to the rows shown (lower rank is better): top third green, middle third yellow, bottom third red; position ranks and dashes are not colored. A dash means unranked.</p>
@@ -38,29 +33,14 @@
 <div class="scroll" id="best-t-bench"></div></section>
 
 <section id="best-waivers"><h2>Waiver flex options</h2>
-<p class="cap">The ten highest-projected unrostered RB, WR and TE (Sleeper projection under this league's scoring), sorted by prop-implied points. The top ten included 1 RB and 4 WRs, so the list was extended to 11 players to include at least 2 RBs and 2 WRs.</p>
+<p class="cap" id="best-wcap"></p>
 <div class="scroll" id="best-t-waiver"></div></section>
 
 <section id="best-league-setup"><h2>League setup</h2>
-<dl>
-<dt>League</dt><dd>Best League, 12 teams, 2026 season, Week 7</dd>
-<dt>Scoring</dt><dd><span class="pill accent">Half PPR</span></dd>
-<dt>Reception / yards</dt><dd>0.5 per reception, 0.1 per rushing or receiving yard, 6 per TD</dd>
-<dt>Passing</dt><dd>0.04 per yard, 4 per TD, -2 per interception</dd>
-<dt>Other</dt><dd>-2 per fumble lost, 2 per 2-point conversion, no TE premium, no yardage bonuses</dd>
-<dt>Kicker</dt><dd>0.5 per extra point; field goals 1.5 (under 40 yards), 2.0 (40-49), 2.5 (50+)</dd>
-<dt>Defense / ST</dt><dd>1 per sack, 2 per interception, 2 per fumble recovery, 2 per safety, 6 per TD; points allowed: 0 = +10, 1-6 = +7, 7-13 = +4, 14-20 = +1, 21-27 = 0, 28-34 = -1, 35+ = -4</dd>
-<dt>Starting slots</dt><dd>QB, RB, RB, WR, WR, TE, FLEX (RB, WR or TE), K, DEF</dd>
-<dt>Bench</dt><dd>6 bench spots and 1 IR spot</dd>
-<dt>Your record</dt><dd>4-2, 4th of 12; Week 7 opponent zackgordon</dd>
-</dl></section>
+<dl id="best-setup"></dl></section>
 
 <section id="best-data-notes"><h2>Data notes and sources</h2>
-<ul>
-<li>Projections: Sleeper (Rotowire feed) re-scored to this league's settings.</li>
-<li>Props: Fieldwork (DraftKings, FanDuel, BetMGM, BetRivers), cross-checked with Sharp Football Analysis and EVAnalytics. A dash means no line was posted.</li>
-<li>Lines can move before kickoff; re-check before lock.</li>
-</ul></section></div>
+<ul id="best-notes"></ul></section></div>
 <footer>Sleeper username: kfelder30</footer>
 <script src="report-core.js"></script>
 <script src="refresh.js"></script>

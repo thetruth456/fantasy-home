@@ -1,0 +1,87 @@
+name: Update fantasy data
+
+# Runs every hour; tools/update.py decides whether this hour is worth a refresh:
+#   Saturday 1:00 PM PT through Sunday 10:00 AM PT -> every hour
+#   any other time                                 -> once a day, at the 9 AM PT run
+# The gate uses America/Los_Angeles local time, so the Nov 1 DST change needs no edit here.
+# "Run workflow" (or the site's Refresh everything button) sets force=true and skips the gate.
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Skip the schedule gate and refresh now"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: fantasy-data-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r tools/requirements.txt
+
+      - name: Today's date (cache key)
+        id: day
+        run: echo "d=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Sleeper players dump (about 10 MB, one new copy per day)
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: players-${{ steps.day.outputs.d }}
+          restore-keys: players-
+
+      - name: Update data
+        id: update
+        env:
+          # workflow_dispatch passes the boolean as "true"/"false"; scheduled runs have no input and are gated
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force || 'false' }}
+        run: python tools/update.py
+
+      - name: Commit and push if data changed
+        id: commit
+        run: |
+          git config user.name "fantasy-data-bot"
+          git config user.email "fantasy-data-bot@users.noreply.github.com"
+          git add -- '*-report.js'
+          if git diff --cached --quiet; then
+            echo "No data change, nothing to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m "Update data $(date -u +'%Y-%m-%d %H:%M UTC')"
+          for i in 1 2 3; do
+            if git push; then
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Push rejected (attempt $i); rebasing and retrying"
+            git pull --rebase -X theirs origin "${GITHUB_REF_NAME}"
+          done
+          echo "Could not push after 3 attempts" >&2
+          exit 1
+
+      - name: Ask GitHub Pages to rebuild (best effort)
+        # Pushes made with GITHUB_TOKEN do not trigger other workflows, so a branch-based Pages deploy
+        # may not rebuild by itself. This asks for a build; it is allowed to fail without failing the run.
+        if: steps.commit.outputs.changed == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${GITHUB_REPOSITORY}/pages/builds"
