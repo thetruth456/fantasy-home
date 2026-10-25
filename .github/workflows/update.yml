@@ -7,7 +7,8 @@ name: Update fantasy data
 # "Run workflow" (or the site's Refresh everything button) sets force=true and skips the gate.
 on:
   schedule:
-    - cron: "0 * * * *"
+    # off-peak minute: GitHub often drops or delays top-of-the-hour schedules
+    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       force:
