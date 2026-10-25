@@ -1,60 +1,131 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f6b3f">
 <title>Fantasy home base</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="style.css">
-</head><body>
-<header class="site"><div class="in"><a class="brand" href="index.html">Fantasy home base</a><nav class="tabs" role="tablist" aria-label="Leagues"><button type="button" role="tab" data-p="best" aria-selected="true">Best League</button><button type="button" role="tab" data-p="zbt" aria-selected="false">ZBT</button><button type="button" role="tab" data-p="oops" aria-selected="false">Oopsilons</button><button type="button" role="tab" data-p="spacex" aria-selected="false">SpaceX FF</button></nav></div></header>
+</head><body class="theme-best" id="body">
+<header class="site"><div class="in"><a class="brand" href="index.html"><img src="favicon.svg" alt="" width="30" height="30"><span>Fantasy <b>home base</b></span></a><nav class="tabs" role="tablist" aria-label="Leagues"><button type="button" role="tab" data-p="best" class="theme-best" data-theme="theme-best" aria-selected="true" aria-controls="p-best">Best League</button><button type="button" role="tab" data-p="zbt" class="theme-zbt" data-theme="theme-zbt" aria-selected="false" aria-controls="p-zbt">ZBT</button><button type="button" role="tab" data-p="oops" class="theme-oops" data-theme="theme-oops" aria-selected="false" aria-controls="p-oops">Oopsilons</button><button type="button" role="tab" data-p="spacex" class="theme-spacex" data-theme="theme-spacex" aria-selected="false" aria-controls="p-spacex">SpaceX FF</button></nav></div></header>
 <div class="wrap">
-<h1>Fantasy home base</h1>
-<p class="asof">Pick a league tab to see its weekly flex tiebreaker snapshots.</p>
-<div class="panel" id="p-best" role="tabpanel">
-<section><h2>Best League</h2>
-<p class="meta">Sleeper league 1389358450705727488 &middot; 12 teams &middot; 4-2, 4th</p>
-<a class="btnlink" href="best-league.html">Open league page</a>
+<div class="panel theme-best" id="p-best" role="tabpanel">
+<p class="weekline">Weekly snapshots: none yet <span class="sep">|</span> <a href="best-league.html">Standalone page</a></p>
+<h1>Best League <span class="pill neutral">Template</span></h1>
+<p class="asof">Week 7 snapshot coming soon. Props as of &mdash;; Sleeper projections as of &mdash;.</p>
+<section class="quick"><h2>Quick read (suggestion only)</h2>
+<ul><li>Week 7 snapshot coming soon.</li></ul></section>
+
+<section id="best-flex-tiebreaker"><h2>Flex tiebreaker</h2>
+<p class="cap">Prop-implied pts column will be colored relative to the rows shown (green top third, yellow middle, red bottom).</p>
+<div class="scroll"><table class="tpl"><thead><tr><th>Slot</th><th>Player</th><th>Pos</th><th>Opponent</th><th>Prop-implied pts</th><th>Sleeper proj</th><th>Status</th><th>Rush yds line</th><th>Rec yds line</th><th>Rec line</th><th>Anytime TD (DK)</th></tr></thead><tbody><tr><td class="note" colspan="11">Template: rows appear here once the Week 7 snapshot is added.</td></tr></tbody></table></div></section>
+
+<section id="best-starters"><h2>Starters</h2>
+<p class="cap">Grouped by lineup slot.</p>
+<div class="scroll"><table class="tpl"><thead><tr><th>Slot</th><th>Player</th><th>Pos</th><th>Opponent</th><th>Prop-implied pts</th><th>Sleeper proj</th><th>Status</th><th>Rush yds line</th><th>Rec yds line</th><th>Rec line</th><th>Anytime TD (DK)</th></tr></thead><tbody><tr><td class="note" colspan="11">Template: rows appear here once the Week 7 snapshot is added.</td></tr></tbody></table></div></section>
+
+<section id="best-bench"><h2>Bench</h2>
+<p class="cap">Sorted by prop-implied points, highest first.</p>
+<div class="scroll"><table class="tpl"><thead><tr><th>Slot</th><th>Player</th><th>Pos</th><th>Opponent</th><th>Prop-implied pts</th><th>Sleeper proj</th><th>Status</th><th>Rush yds line</th><th>Rec yds line</th><th>Rec line</th><th>Anytime TD (DK)</th></tr></thead><tbody><tr><td class="note" colspan="11">Template: rows appear here once the Week 7 snapshot is added.</td></tr></tbody></table></div></section>
+
+<section id="best-waivers"><h2>Waiver wire options</h2>
+<p class="cap">Top flex-eligible (RB, WR, TE) free agents by projection, sorted by prop-implied points.</p>
+<div class="scroll"><table class="tpl"><thead><tr><th>Slot</th><th>Player</th><th>Pos</th><th>Opponent</th><th>Prop-implied pts</th><th>Sleeper proj</th><th>Status</th><th>Rush yds line</th><th>Rec yds line</th><th>Rec line</th><th>Anytime TD (DK)</th></tr></thead><tbody><tr><td class="note" colspan="11">Template: rows appear here once the Week 7 snapshot is added.</td></tr></tbody></table></div></section>
+
+<section id="best-league-setup"><h2>League setup</h2>
+<dl>
+<dt>League</dt><dd>Best League, 12 teams, 2026 season (Sleeper league 1389358450705727488)</dd>
+<dt>Scoring</dt><dd><span class="pill accent">Half PPR</span></dd>
+<dt>Reception / yards</dt><dd>0.5 per reception, 0.1 per rushing or receiving yard, 6 per TD</dd>
+<dt>Passing</dt><dd>0.04 per yard, 4 per TD, -2 per interception</dd>
+<dt>Other</dt><dd>-2 per fumble lost, 2 per 2-point conversion, no TE premium, no yardage bonuses</dd>
+<dt>Kicker</dt><dd>0.5 per extra point; field goals 1.5 (under 40 yards), 2.0 (40-49), 2.5 (50+)</dd>
+<dt>Defense / ST</dt><dd>1 per sack, 2 per interception, 2 per fumble recovery, 2 per safety, 6 per TD; points allowed: 0 = +10, 1-6 = +7, 7-13 = +4, 14-20 = +1, 21-27 = 0, 28-34 = -1, 35+ = -4</dd>
+<dt>Starting slots</dt><dd>QB, RB, RB, WR, WR, TE, FLEX (RB, WR or TE), K, DEF</dd>
+<dt>Bench</dt><dd>6 bench spots and 1 IR spot</dd>
+<dt>Your record</dt><dd>4-2, 4th of 12</dd>
+</dl></section></div>
+<div class="panel theme-zbt" id="p-zbt" role="tabpanel" hidden>
+<p class="weekline">Weekly snapshots: <a href="zbt.html">Week 7 (latest)</a> <span class="sep">|</span> <a href="zbt.html">Standalone page</a></p>
+<h1>ZBT Week 7: roster, waiver flex options and prop tiebreakers</h1>
+<p class="asof">Props as of Oct 24, 9:31 PM ET (Oct 25, 01:31 UTC); Sleeper projections as of Oct 25, 01:30 UTC.</p>
+
+<section class="quick"><h2>Quick read (suggestion only)</h2>
+<ul>
+<li>Your FLEX is Ryan Flournoy (7.0 proj, 8.1 prop-implied, Monday night).</li>
+<li>On props he is level with free agents Juwan Johnson (TE NO, 10.3 proj, 8.1) and Dalton Schultz (TE HOU, 8.5 proj, 8.1); Johnson has the clearly better projection.</li>
+<li>Ted Hurst III (WR TB at CAR) is next at 7.8.</li>
+<li>Barkley is Questionable for Monday night.</li>
+</ul></section>
+
+<section id="zbt-flex-tiebreaker"><h2>Flex tiebreaker</h2>
+<p class="cap">Color in the Prop-implied pts column is relative to the rows shown: top third green, middle third yellow, bottom third red. The number in parentheses after Sleeper proj is prop-implied minus projection (green above, red below).</p>
+<div class="ctl"><div class="seg" id="seg-view"></div><div class="seg" id="seg-sort"></div></div>
+<div class="scroll" id="t-flex"></div></section>
+
+<section id="zbt-starters"><h2>Starters</h2>
+<p class="cap">Grouped by lineup slot. Yardage and reception figures are the consensus line, with the range across books in brackets when books differ. Anytime TD shows the DraftKings price, with the range across four books (lowest to highest payout). A dash means no market was posted.</p>
+<div class="scroll" id="t-starters"></div></section>
+
+<section id="zbt-bench"><h2>Bench</h2>
+<p class="cap">Sorted by prop-implied points, highest first.</p>
+<div class="scroll" id="t-bench"></div></section>
+
+<section id="zbt-waivers"><h2>Waiver flex options</h2>
+<p class="cap">The ten highest-projected unrostered RB, WR and TE (Sleeper projection under this league's scoring), sorted by prop-implied points. The top ten already include 3 WRs and 2 RBs, so the list was not extended.</p>
+<div class="scroll" id="t-waiver"></div></section>
+
+<section id="zbt-league-setup"><h2>League setup</h2>
+<dl>
+<dt>League</dt><dd>ZBT, 14 teams, 2026 season, Week 7</dd>
+<dt>Scoring</dt><dd><span class="pill accent">Full PPR</span></dd>
+<dt>Reception / yards</dt><dd>1.0 per reception, 0.1 per rushing or receiving yard, 6 per TD</dd>
+<dt>Passing</dt><dd>0.04 per yard, 4 per TD, -2 per interception</dd>
+<dt>Other</dt><dd>-2 per fumble lost, no TE premium, no yardage bonuses, K and DEF score as standard</dd>
+<dt>Starting slots</dt><dd>QB, RB, RB, WR, WR, TE, FLEX (RB, WR or TE), K, DEF</dd>
+<dt>Bench</dt><dd>6 bench spots and 1 IR spot</dd>
+<dt>Your record</dt><dd>4-2, 4th of 14; Week 7 opponent keegs23</dd>
+</dl></section>
+
+<section id="zbt-data-notes"><h2>Data notes and sources</h2>
+<ul>
+<li>Projections: Sleeper (Rotowire feed) re-scored to this league's settings.</li>
+<li>Props: Fieldwork (DraftKings, FanDuel, BetMGM, BetRivers), cross-checked with Sharp Football Analysis and EVAnalytics. A dash means no line was posted.</li>
+<li>Lines can move before kickoff; re-check before lock.</li>
+</ul></section></div>
+<div class="panel theme-oops" id="p-oops" role="tabpanel" hidden>
+<p class="weekline">Weekly snapshots: none yet <span class="sep">|</span> <a href="oopsilons.html">Standalone page</a></p>
+<h1>Oopsilons</h1>
+<p class="asof">Sleeper league 1389754735367589888</p>
+<section id="oops-soon"><h2>Coming soon</h2>
+<p class="cap">12 teams, 2026 season. The first weekly report will appear here.</p>
 </section>
-<section><h2>Week</h2>
-<p class="cap">Weekly snapshots, newest first.</p>
-<ul class="weeks"><li>No weekly snapshots yet.</li></ul></section>
 </div>
-<div class="panel" id="p-zbt" role="tabpanel">
-<section><h2>ZBT</h2>
-<p class="meta">Sleeper league 1389375330296279040 &middot; 14 teams &middot; 4-2, 4th</p>
-<a class="btnlink" href="zbt.html">Open league page</a>
+<div class="panel theme-spacex" id="p-spacex" role="tabpanel" hidden>
+<p class="weekline">Weekly snapshots: none yet <span class="sep">|</span> <a href="spacex-ff.html">Standalone page</a></p>
+<h1>SpaceX FF 2026</h1>
+<p class="asof">Sleeper league 1398902725940367360</p>
+<section id="spacex-soon"><h2>Coming soon</h2>
+<p class="cap">12 teams, 2026 season. The first weekly report will appear here.</p>
 </section>
-<section><h2>Week</h2>
-<p class="cap">Weekly snapshots, newest first.</p>
-<ul class="weeks"><li><a href="zbt.html">Week 7 (latest)</a></li></ul></section>
-</div>
-<div class="panel" id="p-oops" role="tabpanel">
-<section><h2>Oopsilons</h2>
-<p class="meta">Sleeper league 1389754735367589888 &middot; 12 teams</p>
-<a class="btnlink" href="oopsilons.html">Open league page</a>
-</section>
-<section><h2>Week</h2>
-<p class="cap">Weekly snapshots, newest first.</p>
-<ul class="weeks"><li>No weekly snapshots yet.</li></ul></section>
-</div>
-<div class="panel" id="p-spacex" role="tabpanel">
-<section><h2>SpaceX FF</h2>
-<p class="meta">Sleeper league 1398902725940367360 &middot; 12 teams</p>
-<a class="btnlink" href="spacex-ff.html">Open league page</a>
-</section>
-<section><h2>Week</h2>
-<p class="cap">Weekly snapshots, newest first.</p>
-<ul class="weeks"><li>No weekly snapshots yet.</li></ul></section>
 </div>
 </div>
 <footer>Sleeper username: kfelder30</footer>
+<script src="zbt-report.js"></script>
 <script>
 (function(){
 var ids=["best","zbt","oops","spacex"];
 var tabs=document.querySelectorAll(".tabs button");
 function show(id){if(ids.indexOf(id)<0)id="best";
 for(var i=0;i<ids.length;i++){document.getElementById("p-"+ids[i]).hidden=ids[i]!==id}
-for(var j=0;j<tabs.length;j++){tabs[j].setAttribute("aria-selected",tabs[j].getAttribute("data-p")===id)}
+var th="theme-best";
+for(var j=0;j<tabs.length;j++){var on=tabs[j].getAttribute("data-p")===id;tabs[j].setAttribute("aria-selected",on);if(on)th=tabs[j].getAttribute("data-theme")}
+document.body.className=th;
 if(history.replaceState)history.replaceState(null,"","#"+id)}
 for(var k=0;k<tabs.length;k++){tabs[k].onclick=function(){show(this.getAttribute("data-p"))}}
+window.addEventListener("hashchange",function(){show(location.hash.replace("#",""))});
 show(location.hash.replace("#",""));
 })();
 </script>
