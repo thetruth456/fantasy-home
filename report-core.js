@@ -1,6 +1,6 @@
 /* Shared report renderer. Each league file sets window.REPORTS[key] = {STARTERS, BENCH, WAIVER}; call initReport(key). */
 (function(){
-var COLS=["Slot","Player","Pos","Opponent","Prop-implied pts","Sleeper proj","Status","Rush yds line","Rec yds line","Rec line","Anytime TD (DK)"];
+var COLS=["Slot","Player","Pos","Opponent","Prop-implied pts","Sleeper proj","FP rank","Status","Rush yds line","Rec yds line","Rec line","Anytime TD (DK)"];
 var SLOT={BN:"Bench",WAIVER:"FA"};
 function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function pill(t,c){return '<span class="pill '+c+'">'+esc(t)+'</span>'}
@@ -10,7 +10,7 @@ function statusCell(s){if(s==="Healthy")return pill(s,"success");if(s==="Questio
 function projCell(p){if(p.pp===null)return esc(p.proj)+" "+pill("(\u2014)","neutral");var d=Math.round((parseFloat(p.pp.toFixed(1))-p.pn)*10)/10;var t=d>0?"success":d<0?"danger":"neutral";var x=d>0?"+"+d.toFixed(1):d<0?"-"+Math.abs(d).toFixed(1):"0.0";return esc(p.proj)+" "+pill("("+x+")",t)}
 function table(items){var tm=tiers(items);var h="<table><thead><tr>"+COLS.map(function(c){return"<th>"+esc(c)+"</th>"}).join("")+"</tr></thead><tbody>";
 items.forEach(function(it){var p=it.p,t=tm[p.name];var pp=(p.pp===null||!t)?"\u2014":pill(p.pp.toFixed(1),t);var td=p.atd==="\u2014"?"\u2014":p.atdr?p.atd+" ("+p.atdr+")":p.atd;
-var cells=[esc(it.label),esc(p.name+" \u00b7 "+p.team),esc(p.pos),esc(p.opp),pp,projCell(p),statusCell(p.status),esc(p.rush),esc(p.rec),esc(p.recs),esc(td)];
+var cells=[esc(it.label),esc(p.name+" \u00b7 "+p.team),esc(p.pos),esc(p.opp),pp,projCell(p),esc(p.fp||"\u2014"),statusCell(p.status),esc(p.rush),esc(p.rec),esc(p.recs),esc(td)];
 h+="<tr>"+cells.map(function(c){return"<td>"+c+"</td>"}).join("")+"</tr>"});
 return h+"</tbody></table>"}
 window.initReport=function(key){
