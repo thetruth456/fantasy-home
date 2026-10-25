@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="style.css">
 </head><body class="theme-zbt">
-<header class="site"><div class="in"><a class="brand" href="index.html"><img src="favicon.svg" alt="" width="30" height="30"><span>Fantasy <b>home base</b></span></a><nav class="tabs" aria-label="Leagues"><a href="best-league.html" class="theme-best">Best League</a><a href="zbt.html" aria-current="page" class="theme-zbt">ZBT</a><a href="oopsilons.html" class="theme-oops">Oopsilons</a><a href="spacex-ff.html" class="theme-spacex">SpaceX FF</a></nav></div></header>
+<header class="site"><div class="in"><a class="brand" href="index.html"><img src="favicon.svg" alt="" width="30" height="30"><span>Fantasy <b>home base</b></span></a><nav class="tabs" aria-label="Leagues"><a href="best-league.html" class="theme-best">Best League</a><a href="zbt.html" aria-current="page" class="theme-zbt">ZBT</a><a href="oopsilons.html" class="theme-oops">Oopsilons</a><a href="spacex-ff.html" class="theme-spacex">SpaceX FF</a></nav><div class="refresh"><button type="button" id="refresh-btn" class="refresh-btn"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lbl">Refresh Sleeper projections</span></button><span id="refresh-status" class="refresh-status" role="status" aria-live="polite">Showing snapshot (props and FantasyPros ranks are fixed)</span></div></div></header>
 <div class="wrap">
 <a class="back" href="index.html">&larr; Back to home</a>
 <p class="weekline">Weekly snapshots: <a href="zbt.html">Week 7 (latest)</a></p>
@@ -25,7 +25,7 @@
 </ul></section>
 
 <section id="zbt-flex-tiebreaker"><h2>Flex tiebreaker</h2>
-<p class="cap">Color in the Prop-implied pts column is relative to the rows shown: top third green, middle third yellow, bottom third red. The number in parentheses after Sleeper proj is prop-implied minus projection (green above, red below). FP rank is the FantasyPros weekly consensus rank: flex ranking for RB, WR and TE (half PPR for Best League, PPR for the others), and position rank for QB, K and DEF. A dash means unranked.</p>
+<p class="cap">Color in the Prop-implied pts column is relative to the rows shown: top third green, middle third yellow, bottom third red. The number in parentheses after Sleeper proj is prop-implied minus projection. FP rank is the FantasyPros weekly consensus rank: flex ranking for RB, WR and TE (half PPR for Best League, PPR for the others), and position rank for QB, K and DEF. Color in the FP rank column is relative to the rows shown (lower rank is better): top third green, middle third yellow, bottom third red; position ranks and dashes are not colored. A dash means unranked.</p>
 <div class="ctl"><div class="seg" id="zbt-seg-view"></div><div class="seg" id="zbt-seg-sort"></div></div>
 <div class="scroll" id="zbt-t-flex"></div></section>
 
@@ -61,6 +61,7 @@
 </ul></section></div>
 <footer>Sleeper username: kfelder30</footer>
 <script src="report-core.js"></script>
+<script src="refresh.js"></script>
 <script src="zbt-report.js"></script>
 <script>initReport("zbt");</script>
 </body></html>
