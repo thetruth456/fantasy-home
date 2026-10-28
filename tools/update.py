@@ -63,7 +63,7 @@ def read_data(path):
 
 def write_data(path, key, d):
     parts = ['"META":' + json.dumps(d["META"], ensure_ascii=False, separators=(",", ":"))]
-    for g in ("STARTERS", "BENCH", "WAIVER"):
+    for g in ("STARTERS", "BENCH", "WAIVER", "DEFENSE"):
         parts.append('"%s":%s' % (g, json.dumps(d[g], ensure_ascii=False)))
     js = "window.REPORTS=window.REPORTS||{};\nwindow.REPORTS.%s={\n%s\n};\n" % (key, ",\n".join(parts))
     open(path, "w", encoding="utf-8").write(js)
@@ -73,7 +73,7 @@ def canon(d):
     if not d:
         return None
     m = {k: v for k, v in (d.get("META") or {}).items() if k not in TIME_FIELDS}
-    return json.dumps([m, d.get("STARTERS"), d.get("BENCH"), d.get("WAIVER")], sort_keys=True)
+    return json.dumps([m, d.get("STARTERS"), d.get("BENCH"), d.get("WAIVER"), d.get("DEFENSE") or []], sort_keys=True)
 
 
 def iso(t):
@@ -155,6 +155,18 @@ def main():
     except Exception as e:  # noqa: BLE001
         log("WARNING: FantasyPros unavailable: %s" % e)
 
+    # --- game lines (ESPN) for the Defense table
+    lines = None
+    lines_asof = None
+    try:
+        lines = S.fetch_game_lines(season, week)
+        lines_asof = proj_asof if lines else None
+        log("ESPN game lines: %d teams with a total and spread" % len(lines))
+        if not lines:
+            log("WARNING: ESPN has no posted lines for this week yet; defense line columns show dashes")
+    except Exception as e:  # noqa: BLE001
+        log("WARNING: ESPN game lines unavailable, keeping the previous lines for this week: %s" % e)
+
     changed, failed = [], []
     for key, (fn, lid, flex_page) in LEAGUES.items():
         path = os.path.join(out_dir, fn)
@@ -162,14 +174,19 @@ def main():
         pm = (prev or {}).get("META") or {}
         same_week = bool(prev) and str(pm.get("week")) == str(week)
         prev_rows = {}
+        prev_lines = {}
         if same_week:
-            for g in ("STARTERS", "BENCH", "WAIVER"):
+            for g in ("STARTERS", "BENCH", "WAIVER", "DEFENSE"):
                 for r in prev.get(g, []):
                     prev_rows[(r["name"], r["team"])] = r
+            for r in prev.get("DEFENSE", []):  # last known line per team, used only if ESPN is down
+                if r.get("total") is not None and r.get("opptot") is not None:
+                    prev_lines[build.team_norm(r["team"])] = dict(total=r["total"], spread=r["spread"], opp_total=r["opptot"], team_total=r["total"] - r["opptot"])
         psrc = pm.get("sources", {}) if same_week else {}
         try:
             bundle = S.sleeper_league_bundle(lid, week)
-            d = build.build_league(ctx, bundle, USER_ID, props, fp, flex_page, prev_rows)
+            ctx["lines"] = lines if lines is not None else prev_lines
+            d = build.build_league(ctx, bundle, USER_ID, props, fp, flex_page, prev_rows, (prev or {}).get("DEFENSE") if same_week else None)
         except Exception as e:  # noqa: BLE001
             log("ERROR: league %s failed (%s); keeping its previous data" % (key, e))
             failed.append(key)
@@ -178,7 +195,8 @@ def main():
         sources = dict(
             proj_asof=proj_asof,
             props_asof=props_asof if props is not None else psrc.get("props_asof"),
-            fp_asof=fp_asof if fp is not None else psrc.get("fp_asof"))
+            fp_asof=fp_asof if fp is not None else psrc.get("fp_asof"),
+            lines_asof=lines_asof if lines is not None else (psrc.get("lines_asof") if prev_lines else None))
         META = dict(
             key=key, week=week, season=season, season_type=stype, league_id=m["league_id"], name=m["name"],
             title="%s Week %d: roster, waiver flex options and prop tiebreakers" % (m["name"], week),

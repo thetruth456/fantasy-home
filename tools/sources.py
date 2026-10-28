@@ -151,6 +151,59 @@ def fetch_fp(week):
     return out
 
 
+# ---------------------------------------------------------------- game lines (ESPN public scoreboard, DraftKings odds)
+ESPN_ALIAS = {"WAS": "WSH", "JAC": "JAX"}
+
+
+def fetch_game_lines(season, week):
+    """Return {team: {total, spread, team_total, opp_total}} for games that have not finished, keyed by ESPN abbreviation
+    (WAS and JAC mapped to WSH and JAX). spread is that team's own line (negative = favorite). Games without a posted
+    line, or already final, are left out. Raises if ESPN is unreachable or is showing a different week."""
+    d = get_json("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=%s&seasontype=2&dates=%s" % (week, season), timeout=45)
+    wk = (d.get("week") or {}).get("number")
+    if wk is not None and str(wk) != str(week):
+        raise RuntimeError("ESPN scoreboard is on week %s, not %s" % (wk, week))
+    events = d.get("events") or []
+    if not events:
+        raise RuntimeError("ESPN scoreboard has no games")
+    out = {}
+    for e in events:
+        c = (e.get("competitions") or [{}])[0]
+        if ((e.get("status") or {}).get("type") or {}).get("completed"):
+            continue
+        odds = (c.get("odds") or [None])[0]
+        if not odds:
+            continue
+        total = odds.get("overUnder")
+        teams = {t["homeAway"]: ESPN_ALIAS.get(t["team"]["abbreviation"], t["team"]["abbreviation"]) for t in c.get("competitors", [])}
+        if not isinstance(total, (int, float)) or set(teams) != {"home", "away"}:
+            continue
+        # margin and favorite: the favorite flags and details text ("KC -1.5") agree; spread is the home team's line
+        m = re.match(r"\s*([A-Z]{2,4})\s+(-?\d+(?:\.\d+)?)", odds.get("details") or "")
+        fav = None
+        if (odds.get("homeTeamOdds") or {}).get("favorite"):
+            fav = teams["home"]
+        elif (odds.get("awayTeamOdds") or {}).get("favorite"):
+            fav = teams["away"]
+        if odds.get("details") in ("EVEN", "PK", "Pick", "PICK"):
+            margin, fav = 0.0, None
+        elif m and isinstance(odds.get("spread"), (int, float)) and abs(abs(odds["spread"]) - abs(float(m.group(2)))) < 1e-6:
+            margin = abs(float(m.group(2)))
+            fav = ESPN_ALIAS.get(m.group(1), m.group(1))
+        elif fav and isinstance(odds.get("spread"), (int, float)):
+            margin = abs(odds["spread"])
+        else:
+            continue
+        if not (20 <= total <= 80) or margin > 30 or (margin and fav not in teams.values()):
+            log("  ESPN line looks wrong for %s @ %s (total %s, margin %s); skipped" % (teams["away"], teams["home"], total, margin))
+            continue
+        for side, other in (("home", "away"), ("away", "home")):
+            t, o = teams[side], teams[other]
+            own = 0.0 if not margin else (-margin if t == fav else margin)
+            out[t] = dict(total=float(total), spread=own, team_total=total / 2 - own / 2, opp_total=total / 2 + own / 2)
+    return out
+
+
 def norm(s):
     s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower()
     s = re.sub(r"[.']", "", s)

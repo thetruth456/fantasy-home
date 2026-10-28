@@ -132,8 +132,59 @@ class FPRanks:
         return DASH
 
 
+# ------------------------------------------------------------------ defense: expected points-allowed score
+PA_BUCKETS = [("pts_allow_0", 0, 0), ("pts_allow_1_6", 1, 6), ("pts_allow_7_13", 7, 13), ("pts_allow_14_20", 14, 20),
+              ("pts_allow_21_27", 21, 27), ("pts_allow_28_34", 28, 34), ("pts_allow_35p", 35, 10 ** 6)]
+_DIST = {}
+
+
+def score_dist(total, drives=14, td_share=0.77):
+    """Distribution of an offense's points when it is expected to score `total`.
+    14 independent scoring chances; each is a TD (7 pts) or a field goal (3 pts) or nothing. 77% of the expected points
+    come from TDs and 23% from field goals. This gives lumpy football scores with a standard deviation of about 10 at a
+    22-point total (the NFL norm), which a plain Poisson overstates. Returns a list p[points] up to 98+ (cap folded into the last cell)."""
+    key = round(total, 2)
+    if key in _DIST:
+        return _DIST[key]
+    a = td_share * total / (7.0 * drives)
+    b = (1 - td_share) * total / (3.0 * drives)
+    cap = 7 * drives
+    d = [1.0] + [0.0] * cap
+    for _ in range(drives):
+        n = [0.0] * (cap + 1)
+        for i, x in enumerate(d):
+            if x:
+                n[i] += x * (1 - a - b)
+                n[min(i + 7, cap)] += x * a
+                n[min(i + 3, cap)] += x * b
+        d = n
+    _DIST[key] = d
+    return d
+
+
+def pa_expected(S, opp_total):
+    """Expected points-allowed fantasy score for a defense whose opponent is expected to score opp_total, under scoring settings S."""
+    d = score_dist(max(5.0, min(60.0, float(opp_total))))
+    e = 0.0
+    for k, lo, hi in PA_BUCKETS:
+        v = S.get(k) or 0
+        if v:
+            e += v * sum(d[lo:hi + 1])
+    if S.get("pts_allow"):
+        e += S["pts_allow"] * float(opp_total)
+    return e
+
+
+def def_pp(S, stats, opp_total):
+    """Prop-implied DEF points: Sleeper's projected stat line scored with the league settings, with the points-allowed buckets
+    swapped for the expected score under the opponent's implied total. Yards-allowed buckets stay as Sleeper projects them."""
+    base = sum(S[k] * v for k, v in stats.items()
+               if k in S and S[k] and isinstance(v, (int, float)) and not k.startswith("pts_allow"))
+    return base + pa_expected(S, opp_total)
+
+
 # ------------------------------------------------------------------ rows
-def build_league(ctx, bundle, user_id, props, fp, flex_page, prev_rows):
+def build_league(ctx, bundle, user_id, props, fp, flex_page, prev_rows, prev_def=None):
     """ctx: dict(week, players, proj{pid:entry}, stats{pid:stats}, games{team:(game,'vs'|'@',other)})."""
     L, R = bundle["league"], bundle["rosters"]
     S = L["scoring_settings"]
@@ -251,15 +302,63 @@ def build_league(ctx, bundle, user_id, props, fp, flex_page, prev_rows):
         top.append(cands[i]); i += 1
     wv = [row(p, "WAIVER") for _, p in top]
 
+    try:
+        defense = build_defense(ctx, info, row, pts, S, me, rost, labels)
+    except Exception as e:  # noqa: BLE001
+        log("WARNING: defense table failed (%s); keeping its previous rows" % e)
+        defense = list(prev_def or [])
+
     s = me.get("settings", {})
     srt = sorted(R, key=lambda r: (-r["settings"].get("wins", 0), -(r["settings"].get("fpts", 0) + r["settings"].get("fpts_decimal", 0) / 100)))
     rank = [r["roster_id"] for r in srt].index(me["roster_id"]) + 1
     record = "%d-%d%s" % (s.get("wins", 0), s.get("losses", 0), ("-%d" % s["ties"]) if s.get("ties") else "")
     opp_name = opponent_name(bundle, me)
-    return dict(STARTERS=st, BENCH=bn, WAIVER=wv, meta=dict(
+    return dict(STARTERS=st, BENCH=bn, WAIVER=wv, DEFENSE=defense, meta=dict(
         name=L["name"], league_id=L["league_id"], teams=L["total_rosters"], season=L.get("season"),
         record=record, rank=rank, opponent=opp_name, slots=rp, bn=L["roster_positions"].count("BN"),
         reserve=L["settings"].get("reserve_slots") or 0, scoring=S))
+
+
+def build_defense(ctx, info, row, pts, S, me, rost, labels_unused):
+    """Rows for the Defense table: this user's DEF (starter and bench), then the 8 best unrostered DEF by Sleeper projection.
+    Each row is a normal report row plus total (game O/U), spread (this team's own line, negative = favorite) and opptot
+    (the opponent's implied team total). pp stays None (dash) when there is no line, the game was played, or the team is on bye."""
+    proj, games = ctx["proj"], ctx["games"]
+    lines = ctx.get("lines") or {}
+
+    def make(pid, slot):
+        d = row(pid, slot)
+        d["total"] = d["spread"] = d["opptot"] = None
+        d["pp"] = None
+        ln = lines.get(team_norm(d["team"] or ""))
+        if ln and d["status"] not in ("Played", "Bye", "IR"):
+            x = proj.get(pid)
+            d["total"], d["spread"], d["opptot"] = ln["total"], ln["spread"], round(ln["opp_total"], 2)
+            if x:
+                d["pp"] = round(def_pp(S, x["stats"], ln["opp_total"]), 3)
+        return d
+
+    starters = set(me["starters"])
+    mine = []
+    for pid in me["players"]:
+        q = info(pid)
+        if q.get("position") == "DEF":
+            mine.append(make(pid, "DEF" if pid in starters else "BN"))
+    key = lambda r: (r["pp"] is None, -(r["pp"] or 0), -r["pn"])  # noqa: E731
+    mine.sort(key=key)
+    cands = []
+    for pid, x in proj.items():
+        q = info(pid)
+        if pid in rost or q.get("position") != "DEF" or not q.get("team"):
+            continue
+        g = games.get(q["team"])
+        if not g or g[0].get("status") == "complete":  # bye or already played: nothing to pick up
+            continue
+        cands.append((pts(x["stats"]), pid))
+    cands.sort(key=lambda t: (-t[0], t[1]))
+    fa = [make(pid, "WAIVER") for _, pid in cands[:8]]
+    fa.sort(key=key)
+    return mine + fa
 
 
 def opponent_name(bundle, me):
@@ -369,6 +468,7 @@ def waiver_caption(wv):
 
 NOTES_STD = ["Projections: Sleeper (Rotowire feed) re-scored to this league's settings.",
              "Props: Fieldwork (DraftKings, FanDuel, BetMGM, BetRivers), cross-checked with Sharp Football Analysis and EVAnalytics. A dash means no line was posted.",
+             "Game lines (total and spread) for the Defense table: ESPN (DraftKings).",
              "Lines can move before kickoff; re-check before lock."]
 
 
@@ -404,6 +504,10 @@ def _short(r, opp=False):
     if r["pp"] is not None:
         extra.append("%.1f" % r["pp"])
     return "%s (%s, %s)" % (r["name"], head, ", ".join(extra))
+
+
+def _short_def(r):
+    return "%s (%s, %s proj, %.1f prop-implied)" % (r["name"], (r["opp"] or "").split(" (")[0], r["proj"], r["pp"])
 
 
 def _long(r):
@@ -477,6 +581,16 @@ def quick_read(d):
         out.append(s)
     elif best_bn:
         out.append("The best bench option is %s." % _short(best_bn[1]))
+    # defense bullet: only when there is a clear upgrade
+    dfs = d.get("DEFENSE") or []
+    sd = next((r for r in dfs if r["slot"] == "DEF"), None)
+    fa_d = [r for r in dfs if r["slot"] == "WAIVER" and r["pp"] is not None]
+    if sd and fa_d:
+        b = fa_d[0]
+        if sd["status"] == "Bye":
+            out.append("Your defense %s is on bye; the best free-agent defense is %s." % (sd["name"], _short_def(b)))
+        elif sd["pp"] is not None and b["pp"] >= sd["pp"] + 1.5:
+            out.append("Free-agent defense %s is well ahead of your %s (%s proj, %.1f prop-implied)." % (_short_def(b), sd["name"], sd["proj"], sd["pp"]))
     # status bullet
     played = [r for r in st + bn if r["status"] == "Played"]
     parts = []
@@ -536,4 +650,6 @@ def asof_text(src):
     bits.append("Sleeper projections as of %s UTC" % _fmt(parse_iso(s), "UTC") if s else "Sleeper projections not available")
     f = src.get("fp_asof")
     bits.append("FantasyPros ranks as of %s UTC" % _fmt(parse_iso(f), "UTC") if f else "FantasyPros ranks not available")
+    g = src.get("lines_asof")
+    bits.append("game lines as of %s UTC" % _fmt(parse_iso(g), "UTC") if g else "game lines not available")
     return "; ".join(bits) + "."

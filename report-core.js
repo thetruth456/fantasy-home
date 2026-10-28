@@ -1,6 +1,7 @@
 /* Shared report renderer. Each league file sets window.REPORTS[key] = {STARTERS, BENCH, WAIVER}; call initReport(key). */
 (function(){
 var COLS=["Slot","Player","Pos","Opponent","Prop-implied pts","Sleeper proj","FP rank","Status","Rush yds line","Rec yds line","Rec line","Anytime TD (DK)"];
+var DCOLS=["Slot","Player","Pos","Opponent","Prop-implied pts","Sleeper proj","FP rank","Status","Opp implied total","Game total (O/U)","Spread"];
 var SLOT={BN:"Bench",WAIVER:"FA"};
 function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function pill(t,c){return '<span class="pill '+c+'">'+esc(t)+'</span>'}
@@ -16,6 +17,16 @@ items.forEach(function(it){var p=it.p,t=tm[p.name];var pp=(p.pp===null||!t)?"\u2
 var cells=[esc(it.label),esc(p.name+" \u00b7 "+p.team),esc(p.pos),esc(p.opp),pp,projCell(p),(fm[p.name]?pill(p.fp,fm[p.name]):esc(p.fp||"\u2014")),statusCell(p.status),esc(p.rush),esc(p.rec),esc(p.recs),esc(td)];
 h+="<tr>"+cells.map(function(c){return"<td>"+c+"</td>"}).join("")+"</tr>"});
 return h+"</tbody></table>"}
+function dfpVal(p){var m=/^DEF(\d+)$/.exec(String(p.fp));return m?parseInt(m[1],10):null}
+function num1(v){return v==null?"\u2014":(Math.round(v*10)/10).toFixed(1)}
+function spreadTxt(v){return v==null?"\u2014":v===0?"PK":(v>0?"+":"")+v}
+function dtable(items){var tm=tiersBy(items,ppVal,false),fm=tiersBy(items,dfpVal,true);var h="<table><thead><tr>"+DCOLS.map(function(c){return"<th>"+esc(c)+"</th>"}).join("")+"</tr></thead><tbody>";
+items.forEach(function(it){var p=it.p,t=tm[p.name];var pp=(p.pp==null||!t)?"\u2014":pill(p.pp.toFixed(1),t);
+var cells=[esc(it.label),esc(p.name+" \u00b7 "+p.team),esc(p.pos),esc(p.opp),pp,projCell(p),(fm[p.name]?pill(p.fp,fm[p.name]):esc(p.fp||"\u2014")),statusCell(p.status),num1(p.opptot),num1(p.total),spreadTxt(p.spread)];
+h+="<tr>"+cells.map(function(c){return"<td>"+c+"</td>"}).join("")+"</tr>"});
+return h+"</tbody></table>"}
+function defItems(rows){var L={DEF:"Starter",BN:"Bench",WAIVER:"FA"};var mine=rows.filter(function(p){return p.slot!=="WAIVER"}).sort(byPP),fa=rows.filter(function(p){return p.slot==="WAIVER"}).sort(byPP);
+return mine.concat(fa).map(function(p){return{p:p,label:L[p.slot]||p.slot}})}
 window.initReport=function(key){
 function D(){return window.REPORTS[key]}
 function $(id){return document.getElementById(key+"-"+id)}
@@ -43,6 +54,7 @@ function draw(){var d=D(),STARTERS=d.STARTERS,BENCH=d.BENCH,WAIVER=d.WAIVER;text
 $("t-starters").innerHTML=table(STARTERS.map(function(p){return{p:p,label:lab(p.slot)}}));
 $("t-bench").innerHTML=table(BENCH.slice().sort(byPP).map(function(p){return{p:p,label:"Bench"}}));
 $("t-waiver").innerHTML=table(WAIVER.slice().sort(byPP).map(function(p){return{p:p,label:"FA"}}));
+var dt=$("t-def");if(dt)dt.innerHTML=dtable(defItems(d.DEFENSE||[]));
 render()}
 window.REDRAW=window.REDRAW||{};window.REDRAW[key]=draw;
 draw();

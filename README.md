@@ -13,6 +13,8 @@ A GitHub Action (`.github/workflows/update.yml`) runs `python tools/update.py` o
 | Waiver list (about 10, at least 2 WR and 2 RB, at most 14) | Sleeper free agents ranked by prop-implied pts | `WAIVER` rows |
 | Props and prop-implied pts (0.1/yd rush and rec, 1/reception, 6 x anytime-TD probability) | Fieldwork | `pp` and the line columns |
 | FP rank (flex rank for RB/WR/TE, position rank for QB/K/DEF) | FantasyPros consensus | `fp` |
+| Game total and spread (Defense table) | ESPN scoreboard API (DraftKings lines) | `total`, `spread`, `opptot` on `DEFENSE` rows |
+| Defense table: your DEF, then the next 8 best unrostered DEF by Sleeper projection | Sleeper, FantasyPros `dst`, ESPN | `DEFENSE` rows |
 | Quick read, league setup, notes, "as of" line, titles | generated from the data above | `META` in each data file |
 
 The pages hold no week-specific text: `report-core.js` fills the title, as-of line, quick read, setup, notes and week label from `window.REPORTS.<key>.META`, so a new week needs no HTML edit.
@@ -30,6 +32,14 @@ Because the gate uses local Pacific time, the Nov 1 DST change needs no edit. If
 ### Failure handling
 
 If one source fails, only that source keeps its previous values (for the same week) and the log says so (shown as warnings on the run page). If a source has no data for a new week yet, those cells show a dash instead of old numbers. If Sleeper itself is unreachable, nothing is changed and the run fails. One league failing does not stop the others from being committed. Nothing is ever fabricated.
+
+### Defense table
+
+Each league has a Defense table below the flex tiebreaker: your defenses (starter and bench), then the next 8 best unrostered DEF by Sleeper projection (`DEFENSE` in the data file, `<key>-t-def` in the page).
+
+* Opp implied total = game total / 2 + this defense's own spread / 2 (spread is negative for the favorite). Game lines come from ESPN's public scoreboard (`site.api.espn.com`, DraftKings odds) through plain `urllib`.
+* Prop-implied pts = Sleeper's projected DEF stat line scored with the league's settings, minus the points-allowed buckets, plus the expected points-allowed score for the opponent's implied total. The opponent's score is modelled as 14 scoring chances worth 7 (touchdown) or 3 (field goal), 77% of expected points from touchdowns, then scored with the league's own `pts_allow_*` settings. Yards-allowed buckets stay as Sleeper projects them.
+* A game with no line yet, a game already played, or a bye shows dashes and falls back to the Sleeper projection (nothing is guessed). If ESPN is unreachable the previous lines for the same week are kept; the as-of line ends with "game lines as of ..." (or "game lines not available").
 
 ### Local run
 
@@ -60,7 +70,7 @@ Requires Python 3.9+ (`pip install -r tools/requirements.txt` gives zoneinfo dat
 * `index.html`: tabbed home, one tab per league. Standalone pages: `best-league.html`, `zbt.html`, `oopsilons.html`, `spacex-ff.html`.
 * `style.css`, `report-core.js` (renders the tables and text), `refresh.js` (both buttons).
 * `*-report.js`: generated data files. Do not edit by hand; changes are overwritten by the next run.
-* `tools/`: `update.py` (orchestration and gate), `sources.py` (Sleeper, Fieldwork, FantasyPros fetchers), `build.py` (scoring, props, ranks, waiver list, text), `overrides.json`.
+* `tools/`: `update.py` (orchestration and gate), `sources.py` (Sleeper, Fieldwork, FantasyPros, ESPN fetchers), `build.py` (scoring, props, ranks, waiver list, text), `overrides.json`.
 * `.github/workflows/update.yml`: the schedule.
 
 ## Week roll-over
@@ -71,4 +81,4 @@ Nothing to do by hand. Sleeper switches `week` on its own (around Tuesday). Unti
 
 1. Push this repo to `main` (a token with the `workflow` scope, or a Workflows permission for fine-grained tokens, is needed to push `.github/workflows/`).
 2. Settings, Actions, General: Workflow permissions: Read and write (the workflow also declares `contents: write`).
-3. Run the "Update fantasy data" workflow once from the Actions tab to confirm the runner can reach Sleeper, Fieldwork and FantasyPros.
+3. Run the "Update fantasy data" workflow once from the Actions tab to confirm the runner can reach Sleeper, Fieldwork, FantasyPros and ESPN (the log shows "ESPN game lines: N teams"; N should be about 2 per game).
