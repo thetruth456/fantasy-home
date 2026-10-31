@@ -65,6 +65,10 @@ Requires Python 3.9+ (`pip install -r tools/requirements.txt` gives zoneinfo dat
   * The new data is read through the GitHub contents API, so the page shows it right away; the public site itself updates once GitHub Pages redeploys (usually within a minute or two of the commit).
   * A wrong or expired token (401), a token without Actions access (403), a rate limit, a missing workflow (404) and a failed run each show a short message.
 
+## Best League podcast view
+
+`index.html` (Best League tab) and `best-league.html` have two sub-tabs: **Weekly report** (default) and **Podcast: luck report** (`#best-podcast` on the home page, `#podcast` on the standalone page). The podcast view is a static snapshot: `best-podcast-data.js` is written once by `python tools/podcast.py [last_week]` (Sleeper data only) and rendered by `podcast.js`. The update workflow only commits `*-report.js`, and Refresh everything only reloads those files, so neither touches the podcast view. Re-run `tools/podcast.py` by hand to refresh it.
+
 ## Pages and files
 
 * `index.html`: tabbed home, one tab per league. Standalone pages: `best-league.html`, `zbt.html`, `oopsilons.html`, `spacex-ff.html`.

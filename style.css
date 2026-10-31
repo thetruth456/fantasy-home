@@ -84,3 +84,31 @@ footer{max-width:1400px;margin:0 auto;padding:0 16px 32px;color:var(--mut);font-
 .refresh-status.err{color:#ffd6d6;font-weight:600}
 @media(max-width:600px){.site{position:static}.refresh{margin-left:0;width:100%;align-items:flex-start}.rbtns{justify-content:flex-start}.refresh .refresh-status{max-width:none;text-align:left}}
 @media print{.refresh,.token-panel{display:none}}
+
+/* sub-tabs (Best League: Weekly report | Podcast) */
+.subtabs{display:inline-flex;border:2px solid var(--acc);border-radius:999px;overflow:hidden;background:#fff;margin:0 0 14px}
+.subtabs button{font:inherit;font-size:14px;font-weight:700;border:0;background:#fff;color:var(--acc-text);padding:6px 16px;cursor:pointer}
+.subtabs button+button{border-left:2px solid var(--acc)}
+.subtabs button[aria-selected=true]{background:var(--acc);color:var(--acc-ink)}
+.view[hidden]{display:none}
+/* podcast view */
+.mgr{color:var(--mut);font-weight:400;font-size:12px}
+h3{font-size:15px;margin:16px 0 0;color:var(--acc-text)}
+tr.me td{background:var(--acc-soft)}
+.mt{margin-top:12px}
+.bars{display:grid;gap:6px;margin-top:8px}
+.bar{display:grid;grid-template-columns:minmax(120px,240px) 1fr 52px;align-items:center;gap:10px;font-size:13px}
+.bl{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt{background:var(--nb);border-radius:999px;height:14px;overflow:hidden}
+.bf{display:block;height:100%;border-radius:999px}
+.bf.success{background:#2fa65a}.bf.warning{background:#e0a400}.bf.danger{background:#d64535}
+.bv{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.chart{max-width:760px;margin-top:6px}
+.chart svg{width:100%;height:auto;display:block}
+.chart .grid{stroke:#e3e8e4;stroke-width:1}.chart .avg{stroke:#8a96a3;stroke-width:1.5;stroke-dasharray:5 4}
+.chart .tick{font-size:11px;fill:#556070}.chart .axl{font-size:12px;font-weight:700;fill:#17212b}.chart .dl{font-size:11px;font-weight:600;fill:#17212b}
+.awards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-top:8px}
+.award{border:1px solid var(--line);border-top:4px solid var(--acc);border-radius:10px;padding:10px 12px;background:#fff}
+.award .an{font-weight:800;color:var(--acc-text)}.award .ad{font-size:12px;color:var(--mut);margin-bottom:4px}.award .aw{font-size:14px}
+.meth{font-size:13px}
+@media(max-width:600px){.bar{grid-template-columns:110px 1fr 46px;gap:6px;font-size:12px}.subtabs button{padding:6px 12px;font-size:13px}}
