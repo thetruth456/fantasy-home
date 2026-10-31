@@ -44,7 +44,7 @@ h.push('</ul></section>');
 /* ---- luck index table */
 var li=tiers(T.map(function(t){return t.idx}),true),lw=tiers(T.map(function(t){return t.luck}),true),lb=tiers(T.map(function(t){return t.inj_bill}),false);
 h.push('<section><h2>Luck index</h2><p class="cap">Luck index = the average of two z-scores: wins above expected (actual wins minus all-play expected wins) and the injury bill (reversed, so fewer injuries is luckier). Positive is lucky; green to red is relative to the 12 teams.</p><div class="scroll"><table><thead><tr><th>Rank</th><th>Team</th><th>Manager</th><th>Record</th><th>Expected wins</th><th>Wins above expected</th><th>All-play</th><th>Luck index</th><th>Points for</th><th>Points against</th><th>Injury bill</th></tr></thead><tbody>');
-T.forEach(function(t,i){h.push('<tr'+(t.rid===D.me?' class="me"':'')+'><td>'+t.rank+'</td><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+f1(t.xw)+'</td><td>'+pill(sg(t.luck,1),lw[i])+'</td><td>'+rec(t.apw,t.apl,t.apt)+'</td><td>'+pill(sg(t.idx,2),li[i])+'</td><td>'+f1(t.pf)+'</td><td>'+f1(t.pa)+'</td><td>'+pill(f1(t.inj_bill),lb[i])+'</td></tr>')});
+T.forEach(function(t,i){h.push('<tr><td>'+t.rank+'</td><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+f1(t.xw)+'</td><td>'+pill(sg(t.luck,1),lw[i])+'</td><td>'+rec(t.apw,t.apl,t.apt)+'</td><td>'+pill(sg(t.idx,2),li[i])+'</td><td>'+f1(t.pf)+'</td><td>'+f1(t.pa)+'</td><td>'+pill(f1(t.inj_bill),lb[i])+'</td></tr>')});
 h.push('</tbody></table></div></section>');
 
 /* ---- injuries */
@@ -61,7 +61,7 @@ h.push('<section><h2>Injury report: who got screwed</h2><p class="cap">Injury bi
 h.push('<div class="lg"><span><i></i>Missed so far</span><span><i class="c"></i>Still to miss</span></div><div class="bars stk">');
 byBill.forEach(function(t,i){h.push('<div class="bar"><span class="bl">'+esc(t.name)+'</span><span class="bt"><span class="bf '+bt[i]+'" style="width:'+(t.inj_bill_so/max*100).toFixed(1)+'%"></span><span class="bc '+bt[i]+'" style="width:'+(t.inj_bill_co/max*100).toFixed(1)+'%"></span></span><span class="bv">'+f1(t.inj_bill)+'</span></div>')});
 h.push('</div><div class="scroll mt"><table><thead><tr><th>Team</th><th>Manager</th><th>Games lost</th><th>Still to miss</th><th>By round 1\u20135 picks</th><th>Injury bill</th></tr></thead><tbody>');
-byBill.forEach(function(t,i){h.push('<tr'+(t.rid===D.me?' class="me"':'')+'><td class="tw">'+esc(t.name)+injList(t.rid)+'</td><td>'+esc(t.user)+'</td><td>'+t.inj_games+'</td><td>'+t.inj_games_co+'</td><td>'+t.inj_early+'</td><td>'+pill(f1(t.inj_bill),bt[i])+'</td></tr>')});
+byBill.forEach(function(t,i){h.push('<tr><td class="tw">'+esc(t.name)+injList(t.rid)+'</td><td>'+esc(t.user)+'</td><td>'+t.inj_games+'</td><td>'+t.inj_games_co+'</td><td>'+t.inj_early+'</td><td>'+pill(f1(t.inj_bill),bt[i])+'</td></tr>')});
 h.push('</tbody></table></div></section>');
 
 /* ---- awards */
@@ -96,7 +96,7 @@ h.push('</div></section>');
 
 /* ---- methodology */
 h.push('<section><h2>Methodology</h2><ul class="meth">'+
-'<li><b>Expected wins:</b> each week, the share of the other 11 teams you outscored, summed. Records and scores: '+wk.toLowerCase()+'.</li>'+
+'<li><b>Expected wins:</b> each week, the share of the other 11 teams a team outscored, summed. Records and scores: '+wk.toLowerCase()+'.</li>'+
 '<li><b>Games lost:</b> a drafted player\u2019s NFL team played and he didn\u2019t (byes and a coach\u2019s decision excluded). Week '+D.cur+': Out/IR/PUP players count. Future: reported timelines through week '+D.end+' (season-ending = every game; ranges use the midpoint, counted from the injury week).</li>'+
 '<li><b>Who pays:</b> the team holding the player that week (last holder if he was dropped). Pick value comes from the original draft pick.</li>'+
 '<li><b>Caveat:</b> Sleeper has no injury history, so causes of past misses aren\u2019t confirmed, and return dates are estimates. Data: Sleeper, plus news reports for timelines.</li></ul></section>');

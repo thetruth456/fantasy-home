@@ -48,7 +48,7 @@ var tS=tiers(T.map(function(t){return t.strength}),true),tP=tiers(T.map(function
 var pw=D.pw;
 h.push('<section><h2>Power rankings</h2><p class="cap">Power score = '+Math.round(pw.strength*100)+'% team strength (chance to beat a random league opponent each week, weeks '+(D.cur+1)+'\u2013'+D.reg_end+') + '+Math.round(pw.playoff*100)+'% playoff odds + '+Math.round(pw.first*100)+'% odds of finishing 1st + '+Math.round(pw.title*100)+'% title odds, all 0\u2013100. Odds come from '+D.sims.toLocaleString("en-US")+' simulated seasons.</p>');
 h.push('<div class="scroll"><table><thead><tr><th>Rank</th><th>Team</th><th>Manager</th><th>Record</th><th>Points for</th><th>Strength (pts/wk)</th><th>Proj. record</th><th>Playoff %</th><th>1st place %</th><th>Title %</th><th>Power score</th><th>Note</th></tr></thead><tbody>');
-T.forEach(function(t,i){h.push('<tr'+(t.rid===D.me?' class="me"':'')+'><td>'+t.rank+'</td><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+f1(t.pf)+'</td><td>'+pill(f1(t.strength),tS[i])+'</td><td>'+pr(t)+'</td><td>'+pill(pc(t.playoff),ptier(t.playoff,67,33))+'</td><td>'+pill(pc(t.first),ptier(t.first,20,5))+'</td><td>'+pill(pc(t.title),ptier(t.title,15,5))+'</td><td>'+pill(f1(t.power),tP[i])+'</td><td class="nt">'+note(t)+'</td></tr>')});
+T.forEach(function(t,i){h.push('<tr><td>'+t.rank+'</td><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+f1(t.pf)+'</td><td>'+pill(f1(t.strength),tS[i])+'</td><td>'+pr(t)+'</td><td>'+pill(pc(t.playoff),ptier(t.playoff,67,33))+'</td><td>'+pill(pc(t.first),ptier(t.first,20,5))+'</td><td>'+pill(pc(t.title),ptier(t.title,15,5))+'</td><td>'+pill(f1(t.power),tP[i])+'</td><td class="nt">'+note(t)+'</td></tr>')});
 h.push('</tbody></table></div></section>');
 
 /* ---- projected finish */
@@ -60,10 +60,10 @@ h.push('</div></section>');
 
 /* ---- schedule */
 var tO=tiers(bySos.map(function(t){return t.sos}),false);
-h.push('<section><h2>Remaining schedule: easiest to hardest</h2><p class="cap">Weeks '+D.cur+'\u2013'+D.reg_end+'. Opponent strength = each opponent\u2019s projected points in the week you play them.</p>');
+h.push('<section><h2>Remaining schedule: easiest to hardest</h2><p class="cap">Weeks '+D.cur+'\u2013'+D.reg_end+'. Opponent strength = each opponent\u2019s projected points in the week they meet.</p>');
 h.push('<div class="scroll"><table><thead><tr><th>Rank</th><th>Team</th><th>Record</th><th>Opp. strength (pts/wk)</th><th>Opp. record</th><th>Toughest game left</th></tr></thead><tbody>');
 bySos.forEach(function(t,i){var hard=t.left.slice().sort(function(a,b){return b.mu-a.mu})[0];
-h.push('<tr'+(t.rid===D.me?' class="me"':'')+'><td>'+(i+1)+'</td><td>'+esc(t.name)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+pill(f1(t.sos),tO[i])+'</td><td>'+t.opp_w+'-'+t.opp_l+'</td><td>Week '+hard.week+' vs '+esc(by[hard.opp].name)+'</td></tr>')});
+h.push('<tr><td>'+(i+1)+'</td><td>'+esc(t.name)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+pill(f1(t.sos),tO[i])+'</td><td>'+t.opp_w+'-'+t.opp_l+'</td><td>Week '+hard.week+' vs '+esc(by[hard.opp].name)+'</td></tr>')});
 h.push('</tbody></table></div></section>');
 
 /* ---- methodology */
