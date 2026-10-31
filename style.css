@@ -119,3 +119,6 @@ tr.me td{background:var(--acc-soft)}
 .lg i{display:inline-block;width:22px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;background:#d64535}
 .lg i.c{color:#d64535;background:none;opacity:.6;background-image:repeating-linear-gradient(135deg,currentColor 0 4px,transparent 4px 7px)}
 .src a{margin-right:6px;white-space:nowrap}
+.lg i.success{background:#2fa65a}.lg i.warning{background:#e0a400}
+td.nt{white-space:nowrap;color:var(--mut);font-size:13px}
+td.tw{white-space:normal;min-width:190px;max-width:360px}.inj{color:var(--mut);font-size:12px}

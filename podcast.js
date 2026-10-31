@@ -48,25 +48,48 @@ T.forEach(function(t,i){h.push('<tr'+(t.rid===D.me?' class="me"':'')+'><td>'+t.r
 h.push('</tbody></table></div></section>');
 
 /* ---- injuries */
+/* injured players charged to each team, biggest cost first (same attribution as the bill) */
+var SUF={"Jr.":1,"Sr.":1,"II":1,"III":1,"IV":1,"V":1};
+function short(nm){var w=String(nm).split(" ").filter(function(x){return !SUF[x]});return w.length>1?w.slice(1).join(" "):w[0]||nm}
+var SC={};IP.forEach(function(p){var k=short(p.name);SC[k]=SC[k]&&SC[k]!==p.pid?"dup":p.pid});
+function label(p){var k=short(p.name);return SC[k]==="dup"?p.name.split(" ")[0]+" "+k:k}
+function injList(rid){var L=[];IP.forEach(function(p){var g=0;p.charged.forEach(function(c){if(c[0]===rid)g+=c[1]+c[2]});if(g)L.push({p:p,v:p.val*g})});
+L.sort(function(a,b){return b.v-a.v});if(!L.length)return "";var K=5,sh=L.slice(0,L.length>K?K-1:K).map(function(x){return esc(label(x.p))});
+if(L.length>K)sh.push("+"+(L.length-K+1)+" more");return ' <span class="inj">('+sh.join(", ")+')</span>'}
 var max=byBill[0].inj_bill||1,bt=tiers(byBill.map(function(t){return t.inj_bill}),false);
 h.push('<section><h2>Injury report: who got screwed</h2><p class="cap">Injury bill = games lost \u00d7 the player\u2019s pick value (pick 1 = 100, each later pick 3% less), charged to whoever held him that week. Includes games still to miss through week '+D.end+'.</p>');
 h.push('<div class="lg"><span><i></i>Missed so far</span><span><i class="c"></i>Still to miss</span></div><div class="bars stk">');
 byBill.forEach(function(t,i){h.push('<div class="bar"><span class="bl">'+esc(t.name)+'</span><span class="bt"><span class="bf '+bt[i]+'" style="width:'+(t.inj_bill_so/max*100).toFixed(1)+'%"></span><span class="bc '+bt[i]+'" style="width:'+(t.inj_bill_co/max*100).toFixed(1)+'%"></span></span><span class="bv">'+f1(t.inj_bill)+'</span></div>')});
 h.push('</div><div class="scroll mt"><table><thead><tr><th>Team</th><th>Manager</th><th>Games lost</th><th>Still to miss</th><th>By round 1\u20135 picks</th><th>Injury bill</th></tr></thead><tbody>');
-byBill.forEach(function(t,i){h.push('<tr'+(t.rid===D.me?' class="me"':'')+'><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+t.inj_games+'</td><td>'+t.inj_games_co+'</td><td>'+t.inj_early+'</td><td>'+pill(f1(t.inj_bill),bt[i])+'</td></tr>')});
+byBill.forEach(function(t,i){h.push('<tr'+(t.rid===D.me?' class="me"':'')+'><td class="tw">'+esc(t.name)+injList(t.rid)+'</td><td>'+esc(t.user)+'</td><td>'+t.inj_games+'</td><td>'+t.inj_games_co+'</td><td>'+t.inj_early+'</td><td>'+pill(f1(t.inj_bill),bt[i])+'</td></tr>')});
 h.push('</tbody></table></div></section>');
 
 /* ---- awards */
 function top(key,hi){var v=T.map(function(t){return t[key]}),b=hi?Math.max.apply(null,v):Math.min.apply(null,v);return T.filter(function(t){return t[key]===b})}
 function names(a){return joinNames(a.map(function(t){return '<b>'+esc(t.name)+'</b>'}))}
 var A=[];
-var g1=top("luck",true);A.push(["Golden Horseshoe",names(g1)+": "+sg(g1[0].luck,1)+" wins above expected."]);
-var g2=top("luck",false);A.push(["Broken Mirror",names(g2)+": "+sg(g2[0].luck,1)+" wins vs expected."]);
-var g3=top("inj_bill",true);A.push(["Ambulance on Speed Dial",names(g3)+": biggest injury bill ("+f1(g3[0].inj_bill)+")."]);
-var g4=top("inj_bill",false);A.push(["Bubble Wrap",names(g4)+": smallest injury bill ("+f1(g4[0].inj_bill)+")."]);
-var rb=null,st=null;D.games.forEach(function(g){[[g.a,g.pa,g.b,g.pb],[g.b,g.pb,g.a,g.pa]].forEach(function(x){x.push(g.week);if(x[1]<x[3]&&(!rb||x[1]>rb[1]))rb=x;if(x[1]>x[3]&&(!st||x[1]<st[1]))st=x})});
-if(rb)A.push(["Robbed","<b>"+nm(rb[0])+"</b>: lost with "+rb[1].toFixed(2)+" (week "+rb[4]+")."]);
-if(st)A.push(["Stole One","<b>"+nm(st[0])+"</b>: won with "+st[1].toFixed(2)+" (week "+st[4]+")."]);
+function aw(n,a,txt){if(a&&a.length)A.push([n,names(a)+": "+txt])}
+var g;
+g=top("luck",true);aw("Golden Horseshoe",g,"most wins above expected ("+sg(g[0].luck,1)+"), "+rec(g[0].w,g[0].l,g[0].t)+" on an all-play of "+rec(g[0].apw,g[0].apl,g[0].apt)+".");
+g=top("luck",false);aw("Broken Mirror",g,"fewest wins vs expected ("+sg(g[0].luck,1)+").");
+g=top("top",true);if(g[0].top)aw("Top Dog",g,"league\u2019s top scorer in "+gms(g[0].top).replace("game","week")+".");
+g=top("pf",true);aw("Point Machine",g,"most points for ("+f1(g[0].pf)+").");
+g=top("pa",true);aw("The Gauntlet",g,"most points against ("+f1(g[0].pa)+").");
+g=top("dip",true);aw("Soft Landing",g,"opponents scored "+f1(g[0].dip)+" a week below their average against them.");
+g=top("cw",true);if(g[0].cw)aw("Escape Artist",g,"most wins by under "+D.close_margin+" points ("+g[0].cw+").");
+g=top("cl",true);if(g[0].cl)aw("Heartbreak Hotel",g,"most losses by under "+D.close_margin+" points ("+g[0].cl+").");
+var rb=null,st=null,bl=null;D.games.forEach(function(g){[[g.a,g.pa,g.b,g.pb],[g.b,g.pb,g.a,g.pa]].forEach(function(x){x.push(g.week);if(x[1]<x[3]&&(!rb||x[1]>rb[1]))rb=x;if(x[1]>x[3]&&(!st||x[1]<st[1]))st=x;if(x[1]<x[3]&&(!bl||x[3]-x[1]>bl[3]-bl[1]))bl=x})});
+if(rb)A.push(["Robbed","<b>"+nm(rb[0])+"</b>: lost with "+rb[1].toFixed(2)+" to "+nm(rb[2])+" (week "+rb[4]+")."]);
+if(st)A.push(["Stole One","<b>"+nm(st[0])+"</b>: beat "+nm(st[2])+" with "+st[1].toFixed(2)+" (week "+st[4]+")."]);
+if(bl)A.push(["Mercy Rule","<b>"+nm(bl[0])+"</b>: lost by "+(bl[3]-bl[1]).toFixed(2)+" to "+nm(bl[2])+" (week "+bl[4]+")."]);
+g=top("bottom",true);if(g[0].bottom)aw("Participation Trophy",g,"league\u2019s lowest scorer in "+gms(g[0].bottom).replace("game","week")+".");
+g=top("inj_bill",true);aw("Ambulance on Speed Dial",g,"biggest injury bill ("+f1(g[0].inj_bill)+", "+gms(g[0].inj_games)+").");
+g=top("inj_bill",false);aw("Bubble Wrap",g,"smallest injury bill ("+f1(g[0].inj_bill)+", "+gms(g[0].inj_games)+").");
+g=top("inj_bill_co",true);if(g[0].inj_bill_co)aw("Dark Clouds Ahead",g,"most injury pain still coming ("+f1(g[0].inj_bill_co)+", "+gms(g[0].inj_games_co)+").");
+g=top("inj_early",true);if(g[0].inj_early)aw("Draft Day Regret",g,"most games lost by round 1\u20135 picks ("+g[0].inj_early+").");
+var dg={};(D.trades||[]).forEach(function(t){var p=IP.filter(function(x){return x.pid===t.pid})[0];if(p)p.charged.forEach(function(c){if(c[0]===t.to)dg[t.to]=(dg[t.to]||0)+c[1]+c[2]})});
+var dk=Object.keys(dg).filter(function(k){return dg[k]}).sort(function(a,b){return dg[b]-dg[a]});
+if(dk.length){var dm=dg[dk[0]];A.push(["Damaged Goods",joinNames(dk.filter(function(k){return dg[k]===dm}).map(function(k){return "<b>"+nm(+k)+"</b>"}))+": most games lost by players acquired in trades ("+dm+")."])}
 h.push('<section><h2>Awards</h2><div class="awards">');
 A.forEach(function(a){h.push('<div class="award"><div class="an">'+a[0]+'</div><div class="aw">'+a[1]+'</div></div>')});
 h.push('</div></section>');
@@ -83,12 +106,19 @@ return h.join("");
 window.initPodcast=function(key,opt){opt=opt||{};
 var D=window.PODCAST&&window.PODCAST[key],box=document.getElementById(key+"-podcast");
 if(box)box.innerHTML=D?build(D):'<p class="cap">Podcast data is missing.</p>';
-var btns=document.querySelectorAll('#'+key+'-subtabs button'),rep=document.getElementById(key+"-view-report"),pod=document.getElementById(key+"-view-podcast");
-function set(v,push){v=v==="podcast"?"podcast":"report";rep.hidden=v!=="report";pod.hidden=v!=="podcast";
+var PD=window.POWER&&window.POWER[key],pbox=document.getElementById(key+"-power");
+if(pbox)pbox.innerHTML=PD&&window.buildPower?window.buildPower(PD):'<p class="cap">Power rankings data is missing.</p>';
+var H=opt.hashes||{podcast:opt.podHash};
+var btns=document.querySelectorAll('#'+key+'-subtabs button'),V=[];
+for(var i=0;i<btns.length;i++)V.push(btns[i].getAttribute("data-v"));
+function set(v,push){if(V.indexOf(v)<0)v="report";
+for(var j=0;j<V.length;j++){var el=document.getElementById(key+"-view-"+V[j]);if(el)el.hidden=V[j]!==v}
 for(var i=0;i<btns.length;i++)btns[i].setAttribute("aria-selected",btns[i].getAttribute("data-v")===v);
-if(push&&history.replaceState)history.replaceState(null,"",v==="podcast"?opt.podHash:opt.repHash)}
+if(push&&history.replaceState)history.replaceState(null,"",v==="report"?opt.repHash:H[v])}
+function fromHash(){for(var k in H)if(location.hash===H[k])return k;return "report"}
 for(var i=0;i<btns.length;i++)btns[i].onclick=function(){set(this.getAttribute("data-v"),true);window.scrollTo(0,Math.min(window.scrollY,(document.getElementById(key+"-subtabs").getBoundingClientRect().top+window.scrollY)-80))};
 window["set_"+key+"_view"]=function(v){set(v,false)};
 set(opt.initial||"report",false);
-if(opt.listen)window.addEventListener("hashchange",function(){set(location.hash===opt.podHash?"podcast":"report",false)})};
+if(opt.listen)window.addEventListener("hashchange",function(){set(fromHash(),false)})};
+window.podcastViewFromHash=function(hashes){for(var k in hashes)if(location.hash===hashes[k])return k;return "report"};
 })();
