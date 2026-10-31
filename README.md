@@ -67,7 +67,7 @@ Requires Python 3.9+ (`pip install -r tools/requirements.txt` gives zoneinfo dat
 
 ## Best League podcast view
 
-`index.html` (Best League tab) and `best-league.html` have two sub-tabs: **Weekly report** (default) and **Podcast: luck report** (`#best-podcast` on the home page, `#podcast` on the standalone page). The podcast view is a static snapshot: `best-podcast-data.js` is written once by `python tools/podcast.py [last_week]` (Sleeper data only) and rendered by `podcast.js`. The update workflow only commits `*-report.js`, and Refresh everything only reloads those files, so neither touches the podcast view. Re-run `tools/podcast.py` by hand to refresh it.
+`index.html` (Best League tab) and `best-league.html` have two sub-tabs: **Weekly report** (default) and **Podcast: luck report** (`#best-podcast` on the home page, `#podcast` on the standalone page). The podcast view is a static snapshot: `best-podcast-data.js` is written once by `python tools/podcast.py [last_week]` (Sleeper data only) and rendered by `podcast.js`. The update workflow only commits `*-report.js`, and Refresh everything only reloads those files, so neither touches the podcast view. Re-run `tools/podcast.py` by hand to refresh it. Injury misses are charged to the team holding the player that week; long-term return timelines live in `LONG_TERM` in `tools/podcast.py` (with source links) and need a manual check before each re-run.
 
 ## Pages and files
 

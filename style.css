@@ -112,3 +112,10 @@ tr.me td{background:var(--acc-soft)}
 .award .an{font-weight:800;color:var(--acc-text)}.award .ad{font-size:12px;color:var(--mut);margin-bottom:4px}.award .aw{font-size:14px}
 .meth{font-size:13px}
 @media(max-width:600px){.bar{grid-template-columns:110px 1fr 46px;gap:6px;font-size:12px}.subtabs button{padding:6px 12px;font-size:13px}}
+.stk .bt{display:flex}.stk .bf{border-radius:0;flex:none}
+.bc{display:block;flex:none;height:100%;opacity:.6;background-image:repeating-linear-gradient(135deg,currentColor 0 4px,transparent 4px 7px)}
+.bc.success{color:#2fa65a}.bc.warning{color:#e0a400}.bc.danger{color:#d64535}
+.lg{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin:4px 0 8px}
+.lg i{display:inline-block;width:22px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;background:#d64535}
+.lg i.c{color:#d64535;background:none;opacity:.6;background-image:repeating-linear-gradient(135deg,currentColor 0 4px,transparent 4px 7px)}
+.src a{margin-right:6px;white-space:nowrap}

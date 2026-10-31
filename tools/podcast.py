@@ -17,6 +17,67 @@ CLOSE = 10.0          # a "close" game is decided by fewer than this many points
 KNOWN_NOT_INJURY = {"13288": "Coach's Decision (Sleeper tag on Oct 28)"}  # Nicholas Singleton
 NOT_INJURY = {"Coach's Decision", "Suspension", "Personal", "Not Injury Related"}
 
+RULED_OUT = {"Out", "IR", "PUP"}   # Sleeper tags that count as a miss for a game not played yet (Questionable/Doubtful do not)
+
+# Long-term absences, from news reports (checked Oct 31, 2026). back = first date he is expected to be able to play:
+#   "season" = out past fantasy week 14; "YYYY-MM-DD"; or {"week": n} = earliest return, his team's game that week.
+# Ranges use the midpoint. Every row needs a source; no reported timeline -> no row (Sleeper's tag covers this week only).
+LONG_TERM = {
+    "9226": dict(back="season", injury="Torn ACL (Week 3, Sep 27)", timeline="Out for the 2026 season", basis="Season-ending",
+                 sources=["https://www.nfl.com/news/dolphins-rb-devon-achane-miss-2026-season-acl-tear",
+                          "https://www.cbssports.com/nfl/news/devon-achane-knee-injury-dolphins-chiefs-2026/"]),
+    "5927": dict(back="season", injury="Torn patellar tendon (Oct 19), surgery Oct 30", timeline="Out for the 2026 season", basis="Season-ending",
+                 sources=["https://www.nfl.com/news/commanders-wr-terry-mclaurin-out-rest-of-season-torn-patellar-tendon",
+                          "https://www.commanders.com/news/commanders-terry-mclaurin-injured-reserve-jer-zhan-newton"]),
+    "10222": dict(back="season", injury="Neck surgery (IR Sep 30)", timeline="Out for the 2026 season", basis="Season-ending",
+                  sources=["https://www.nfl.com/news/packers-wr-jayden-reed-to-undergo-neck-surgery-miss-rest-of-2026-season"]),
+    "12508": dict(back="season", injury="Knee surgery: meniscus, MCL/PCL (Sep 25)", timeline="4–6 months; out for the rest of the regular season", basis="Season-ending",
+                  sources=["https://www.giants.com/news/jaxson-dart-to-miss-rest-of-regular-season-jameis-winston-to-start-quarterback-injury-john-harbaugh",
+                           "https://giantswire.usatoday.com/story/sports/nfl/giants/2026/10/01/timeline-giants-jaxson-dart-return-revealed-surgery-went-well/92030077007/"]),
+    "6904": dict(back="season", injury="Blood clots in leg and lungs (IR Oct 17)", timeline="Likely out for the rest of 2026", basis="Season-ending",
+                 sources=["https://www.nfl.com/news/eagles-qb-jalen-hurts-out-2026-season-blood-clots",
+                          "https://www.philadelphiaeagles.com/news/eagles-place-jalen-hurts-on-injured-reserve-sign-rb-jaydon-blue-to-the-active-roster-2026-nfl-week-6-panthers"]),
+    "8205": dict(back="season", injury="Back surgery (IR)", timeline="Lions hope for a late-December return", basis="Late December is after week 14",
+                 sources=["https://sports.yahoo.com/articles/isiah-pacheco-injury-dan-campbell-172500189.html",
+                          "https://www.cbssports.com/fantasy/football/news/lions-isiah-pacheco-still-targeting-december-return/"]),
+    "2133": dict(back="2026-12-13", injury="Ruptured hamstring (Oct 18), surgery Oct 28", timeline="6–10 weeks (McVay hopes for the short end)",
+                 basis="Midpoint: 8 weeks from Oct 18 = Dec 13",
+                 sources=["https://www.cbssports.com/fantasy/football/news/rams-davante-adams-undergoes-hamstring-surgery/",
+                          "https://www.nbcsports.com/fantasy/football/player-news/2026-10-28/mcvay-optimistic-on-adams-hammy-return-post-op"]),
+    "13417": dict(back="2026-12-01", injury="Ankle surgery (Sep 16)", timeline="About 10 weeks; on track for a December return", basis="First December game",
+                  sources=["https://www.espn.co.uk/nfl/story/_/id/49960208/49ers-dezhaun-stribling-surgery-miss-10-weeks",
+                           "https://www.cbssports.com/fantasy/football/news/49ers-dezhaun-stribling-remains-on-track-for-december-return/"]),
+    "11655": dict(back={"week": 13}, injury="Hamstring strain (Week 7), IR", timeline="IR; earliest return Week 13, not season-ending", basis="Earliest return",
+                  sources=["https://www.espn.com/nfl/story/_/id/50300226/giants-place-rb-tyrone-tracy-ir-hamstring-injury",
+                           "https://www.giants.com/news/tyrone-tracy-jr-injured-reserve-gregory-desrosiers-dean-lowry-practice-squad-roster-moves-bye-week-joe-schoen"]),
+    "8121": dict(back={"week": 12}, injury="Shoulder (IR Oct 19)", timeline="IR; earliest return Week 12 (after Week 11 bye), timeline uncertain", basis="Earliest return",
+                 sources=["https://apnews.com/article/romeo-doubs-patriots-injured-reserve-41773cdcbdf5fdd693667b3c8c5ac7ce",
+                          "https://www.fantasypros.com/nfl/news/614938/romeo-doubs-shoulder-facing-uncertain-timetable-to-retun.php"]),
+    "12533": dict(back="2026-11-23", injury="Groin (IR Oct 19)", timeline="IR; estimated return around Nov 23", basis="Reported estimate",
+                  sources=["https://www.espn.com/nfl/story/_/id/50221053",
+                           "https://www.nbcsports.com/fantasy/football/player-news/2026-10-19/commanders-place-croskey-merritt-groin-on-ir"]),
+    "11583": dict(back="2026-11-11", injury="Core-muscle surgery (Sep 23)", timeline="6–8 weeks", basis="Midpoint: 7 weeks from Sep 23 = Nov 11",
+                  sources=["https://www.nfl.com/news/panthers-rb-jonathon-brooks-surgery-out-six-weeks",
+                           "https://www.cbssports.com/fantasy/football/news/panthers-jonathon-brooks-spotted-jogging-thursday/"]),
+    "11618": dict(back="2026-11-15", injury="Knee PCL sprain (Sep 27), IR", timeline="6–8 weeks; no return date set as of Oct 29", basis="Midpoint: 7 weeks from Sep 27 = Nov 15",
+                  sources=["https://www.reuters.com/sports/reports-bucs-wr-jalen-mcmillan-knee-out-6-8-weeks--flm-2026-09-29/",
+                           "https://www.joebucsfan.com/2026/10/update-on-jalen-mcmillan/"]),
+    "9225": dict(back="2026-11-15", injury="Core-muscle injury (Week 4, Oct 4), surgery", timeline="About six weeks or less", basis="6 weeks from Oct 4 = Nov 15",
+                 sources=["https://www.cbssports.com/fantasy/football/news/eagles-tank-bigsby-placed-on-ir/",
+                          "https://www.philadelphiaeagles.com/news/eagles-place-rb-tank-bigsby-on-injured-reserve-release-lb-anfernee-orji-from-the-practice-squad"]),
+    "6819": dict(back={"week": 10}, injury="Plantar fasciitis (short-term IR Oct 10)", timeline="Earliest return Week 10; surgery not ruled out", basis="Earliest return",
+                 sources=["https://www.espn.com/nfl/story/_/id/50149634/steelers-placing-wr-pittman-injured-reserve",
+                          "https://www.nbcsports.com/nfl/profootballtalk/rumor-mill/news/steelers-wr-michael-pittman-headed-to-ir"]),
+    "8142": dict(back={"week": 9}, injury="Heel (IR)", timeline="Expected back Week 9", basis="Reported target",
+                 sources=["https://www.rotoballer.com/when-is-alec-pierce-coming-back-week-7-fantasy-football-injury-return-update-2026-2/1970464",
+                          "https://www.nbcsports.com/nfl/profootballtalk/rumor-mill/news/alec-pierce-not-ready-to-return-to-practice-this-week"]),
+    "7543": dict(back={"week": 9}, injury="Hamstring (IR Oct 1)", timeline="IR; earliest return Week 9 (Week 8 bye), no firmer date", basis="Earliest return",
+                 sources=["https://apnews.com/article/saints-travis-etienne-injured-reserve-a19d20e13c1714fdfdeff81e1cb4dd5f",
+                          "https://www.profootballnetwork.com/travis-etienne-jr-injury-update-week-7-2026-saints-steelers-paris/"]),
+    "13281": dict(back={"week": 9}, injury="Hamstring (IR)", timeline="No return date; earliest Week 9 (Week 8 bye)", basis="Earliest return",
+                  sources=["https://www.usatoday.com/story/sports/nfl/saints/2026/10/25/jordyn-tyson-injury-update-return-saints/92354996007/"]),
+}
+
 
 def get(path):
     return S.get_json(S.SLEEPER + path)
@@ -50,27 +111,79 @@ def main():
     def fpts(st):
         return sum(Sc[k] * v for k, v in st.items() if k in Sc and Sc[k] and isinstance(v, (int, float)))
 
-    # ---------------- injuries (charged to the team that drafted the player)
-    players, inj = [], {rid: dict(games=0, bill=0.0, early=0, worst=None) for rid in team}
+    # ---------------- who held each player each week (trades and waivers move the charge)
+    cur = last + 1                                    # the week in progress (not fully scored yet)
+    end = int(L["settings"].get("playoff_week_start") or 15) - 1   # last fantasy regular-season week
+    M = {w: get("/v1/league/%s/matchups/%s" % (LEAGUE, w)) for w in range(1, cur + 1)}
+    hold = {w: {pid: m["roster_id"] for m in M[w] for pid in (m.get("players") or [])} for w in M}
+    now_hold = {pid: r["roster_id"] for r in rosters for pid in (r.get("players") or [])}
+    for w in range(cur + 1, end + 1):
+        hold[w] = now_hold
+
+    def holder(pid, w, drafted_by):
+        for k in range(w, 0, -1):          # the team holding him that week, else the last team that held him
+            if pid in hold.get(k, {}):
+                return hold[k][pid]
+        return drafted_by
+    trades = []
+    for w in range(1, cur + 1):
+        for x in get("/v1/league/%s/transactions/%s" % (LEAGUE, w)):
+            if x.get("type") == "trade" and x.get("status") == "complete":
+                for pid, to in (x.get("adds") or {}).items():
+                    trades.append(dict(week=w, ts=x.get("status_updated"), pid=pid, to=to, frm=(x.get("drops") or {}).get(pid)))
+
+    # games per NFL team: week -> (date, complete)
+    tg = {}
+    for g in sched:
+        for tm in (g["home"], g["away"]):
+            tg.setdefault(tm, {})[g["week"]] = (g.get("date") or "", g.get("status") == "complete")
+    if cur not in stats:
+        stats[cur] = {e["player_id"]: e for e in S.sleeper_stats(season, cur, "regular") if e.get("player_id")}
+
+    def back_date(lt, nfl):
+        b = lt["back"]
+        if b == "season":
+            return "9999-12-31"
+        if isinstance(b, dict):            # "earliest return Week n": that team's next game on or after week n
+            for w in range(b["week"], 23):
+                if w in tg.get(nfl, {}):
+                    return tg[nfl][w][0]
+            return "9999-12-31"
+        return b
+
+    # ---------------- injuries (charged to whoever held the player that week)
+    players, inj = [], {rid: dict(games=0, bill=0.0, games_so=0, bill_so=0.0, games_co=0, bill_co=0.0, early=0, worst=None) for rid in team}
     for p in picks:
         pid, md = p["player_id"], p.get("metadata") or {}
         q = P.get(pid) or {}
         name = q.get("full_name") or ("%s %s" % (md.get("first_name", ""), md.get("last_name", ""))).strip()
         pos = q.get("position") or md.get("position")
-        missed, gp, pts = [], 0, 0.0
-        for w in weeks:
+        tag = q.get("injury_status")
+        part = q.get("injury_body_part")
+        lt = LONG_TERM.get(pid)
+        missed, coming, gp, pts = [], [], 0, 0.0
+        for w in weeks + [cur]:
             e = stats[w].get(pid) or {}
             st = e.get("stats") or {}
             nfl = e.get("team") or q.get("team")
-            if not nfl or nfl not in played[w]:
+            if not nfl or w not in tg.get(nfl, {}):
                 continue  # bye week, or no NFL team
-            if st.get("gp"):
-                gp += 1
-                pts += fpts(st)
-            else:
-                missed.append(w)
-        tag = q.get("injury_status")
-        part = q.get("injury_body_part")
+            date, done = tg[nfl][w]
+            if done:
+                if st.get("gp"):
+                    if w <= last:
+                        gp += 1
+                        pts += fpts(st)
+                else:
+                    missed.append(w)
+            elif w == cur and (tag in RULED_OUT or (lt and date < back_date(lt, nfl))):
+                coming.append(w)   # this week's game not played yet and he is already ruled out
+        nfl = q.get("team")
+        if lt and nfl:
+            bd = back_date(lt, nfl)
+            for w in range(cur + 1, end + 1):
+                if w in tg.get(nfl, {}) and not tg[nfl][w][1] and tg[nfl][w][0] < bd:
+                    coming.append(w)
         if pid in KNOWN_NOT_INJURY:
             kind, tag, part = "not injury", KNOWN_NOT_INJURY[pid], None
         elif part in NOT_INJURY or tag in ("Sus", "NA"):
@@ -79,28 +192,47 @@ def main():
             kind = "injured"
         else:
             kind = "no tag now"
+        if kind == "not injury":
+            coming = []
         val = 100 * DECAY ** (p["pick_no"] - 1)
-        rec = dict(pick=p["pick_no"], rnd=p["round"], name=name, pos=pos, rid=p["roster_id"], missed=missed,
-                   val=round(val, 1), bill=round(val * len(missed), 1), gp=gp, ppg=round(pts / gp, 1) if gp else None,
+        charged = {}
+        for w in missed:
+            charged.setdefault(holder(pid, w, p["roster_id"]), [0, 0])[0] += 1
+        for w in coming:
+            charged.setdefault(holder(pid, w, p["roster_id"]), [0, 0])[1] += 1
+        now = now_hold.get(pid)
+        rec = dict(pid=pid, pick=p["pick_no"], rnd=p["round"], name=name, pos=pos, rid=p["roster_id"], now=now, missed=missed, coming=coming,
+                   val=round(val, 1), bill_so=round(val * len(missed), 1), bill_co=round(val * len(coming), 1),
+                   bill=round(val * (len(missed) + len(coming)), 1), charged=[[r, a, b] for r, (a, b) in charged.items()],
+                   gp=gp, ppg=round(pts / gp, 1) if gp else None,
                    status=" ".join(x for x in (tag, "(" + part + ")" if part else "") if x), kind=kind)
-        if missed:
+        if lt:
+            rec["lt"] = dict(injury=lt["injury"], timeline=lt["timeline"], basis=lt["basis"], sources=lt["sources"],
+                             back=("season" if lt["back"] == "season" else back_date(lt, nfl) if nfl else None))
+        if missed or coming:
             players.append(rec)
-        if missed and kind != "not injury":
-            t = inj[p["roster_id"]]
-            t["games"] += len(missed)
-            t["bill"] += rec["bill"]
+        if kind == "not injury":
+            continue
+        for r, (a, b) in charged.items():
+            t = inj[r]
+            t["games_so"] += a; t["bill_so"] += val * a
+            t["games_co"] += b; t["bill_co"] += val * b
+            t["games"] += a + b; t["bill"] += val * (a + b)
             if p["round"] <= 5:
-                t["early"] += len(missed)
-            if not t["worst"] or rec["bill"] > t["worst"]["bill"]:
-                t["worst"] = dict(name=name, pick=p["pick_no"], games=len(missed), bill=rec["bill"])
+                t["early"] += a + b
+            share = val * (a + b)
+            if not t["worst"] or share > t["worst"]["bill"]:
+                t["worst"] = dict(name=name, pick=p["pick_no"], games=a + b, bill=round(share, 1))
     players.sort(key=lambda r: -r["bill"])
+    byp = {r["pid"]: r for r in players if r["kind"] != "not injury"}
+    trades = [dict(t, name=byp[t["pid"]]["name"], pick=byp[t["pid"]]["pick"]) for t in trades if t["pid"] in byp]
+    trades.sort(key=lambda t: (t["ts"] or 0))
 
     # ---------------- matchups
     games, scores = [], {w: {} for w in weeks}
     for w in weeks:
-        M = get("/v1/league/%s/matchups/%s" % (LEAGUE, w))
         by = {}
-        for m in M:
+        for m in M[w]:
             scores[w][m["roster_id"]] = float(m.get("points") or 0)
             if m.get("matchup_id"):
                 by.setdefault(m["matchup_id"], []).append(m)
@@ -146,7 +278,9 @@ def main():
         x.update(dict(w=t["w"], l=t["l"], t=t["t"], pf=round(t["pf"], 2), pa=round(t["pa"], 2), apw=t["apw"], apl=t["apl"], apt=t["apt"],
                       xw=round(t["xw"], 2), luck=round(t["w"] + 0.5 * t["t"] - t["xw"], 2), cw=t["cw"], cl=t["cl"],
                       dip=round(t["dip"] / len(weeks), 1), top=t["top"], bottom=t["bottom"], hiloss=t["hiloss"], lowin=t["lowin"],
-                      inj_games=inj[rid]["games"], inj_bill=round(inj[rid]["bill"], 1), inj_early=inj[rid]["early"], inj_worst=inj[rid]["worst"]))
+                      inj_games=inj[rid]["games"], inj_bill=round(inj[rid]["bill"], 1), inj_early=inj[rid]["early"], inj_worst=inj[rid]["worst"],
+                      inj_games_so=inj[rid]["games_so"], inj_bill_so=round(inj[rid]["bill_so"], 1),
+                      inj_games_co=inj[rid]["games_co"], inj_bill_co=round(inj[rid]["bill_co"], 1)))
         rows.append(x)
 
     def z(vals):
@@ -162,7 +296,7 @@ def main():
     close = sorted(games, key=lambda g: abs(g["pa"] - g["pb"]))[:6]
     now = datetime.datetime.now(datetime.timezone.utc)
     data = dict(season=season, weeks=[weeks[0], weeks[-1]], league=L["name"], asof=now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                close_margin=CLOSE, decay=DECAY, teams=rows, players=players, close=close, games=games,
+                close_margin=CLOSE, decay=DECAY, cur=cur, end=end, teams=rows, players=players, trades=trades, close=close, games=games,
                 me=next((r["rid"] for r in rows if r["user"] == "kfelder30"), None))
     with open(OUT, "w") as f:
         f.write("/* Static snapshot generated by tools/podcast.py. The update workflow does not touch this file. */\n")

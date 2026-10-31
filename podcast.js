@@ -24,39 +24,60 @@ function who(t){return '<b>'+esc(t.name)+'</b> <span class="mgr">'+esc(t.user)+'
 var wk=D.weeks[0]===D.weeks[1]?"Week "+D.weeks[0]:"Weeks "+D.weeks[0]+"\u2013"+D.weeks[1];
 var h=[];
 h.push('<h1>Best League luck report: '+wk+'</h1>');
-h.push('<p class="asof">Static snapshot for the podcast, data as of '+esc(ptTime(D.asof))+' (Sleeper, '+wk.toLowerCase()+' only). It is not changed by the hourly update or Refresh everything.</p>');
+h.push('<p class="asof">Static snapshot for the podcast, data as of '+esc(ptTime(D.asof))+' (Sleeper, '+wk.toLowerCase()+'; injuries also include week '+D.cur+' and reported timelines through week '+D.end+'). It is not changed by the hourly update or Refresh everything.</p>');
 
 /* ---- headlines */
 var lucky=T[0],unlucky=T[T.length-1];
-var byLuck=T.slice().sort(function(a,b){return b.luck-a.luck}),byBill=T.slice().sort(function(a,b){return b.inj_bill-a.inj_bill});
-var worstP=D.players.filter(function(p){return p.kind!=="not injury"})[0];
+var byLuck=T.slice().sort(function(a,b){return b.luck-a.luck}),byBill=T.slice().sort(function(a,b){return b.inj_bill-a.inj_bill}),byCo=T.slice().sort(function(a,b){return b.inj_bill_co-a.inj_bill_co});
+var IP=D.players.filter(function(p){return p.kind!=="not injury"}),worstP=IP[0];
+function ch(p){return p.charged.map(function(c){return nm(c[0])+(p.charged.length>1?' ('+(c[1]+c[2])+')':'')}).join(', ')}
+function gms(n){return n+' game'+(n===1?'':'s')}
+var cw=D.cur,endw=D.end;
 h.push('<section class="quick"><h2>The headlines</h2><ul>');
 h.push('<li>Luckiest team: '+who(lucky)+'. '+rec(lucky.w,lucky.l,lucky.t)+' on a schedule worth '+f1(lucky.xw)+' expected wins ('+sg(lucky.luck,1)+'), and an injury bill of '+f1(lucky.inj_bill)+'.</li>');
-h.push('<li>Unluckiest team: '+who(unlucky)+'. '+rec(unlucky.w,unlucky.l,unlucky.t)+' against '+f1(unlucky.xw)+' expected wins ('+sg(unlucky.luck,1)+'), and an injury bill of '+f1(unlucky.inj_bill)+' (league high is '+f1(byBill[0].inj_bill)+').</li>');
+h.push('<li>Unluckiest team: '+who(unlucky)+'. '+rec(unlucky.w,unlucky.l,unlucky.t)+' against '+f1(unlucky.xw)+' expected wins ('+sg(unlucky.luck,1)+'), and an injury bill of '+f1(unlucky.inj_bill)+' ('+f1(unlucky.inj_bill_so)+' so far, '+f1(unlucky.inj_bill_co)+' still coming).</li>');
 var pfRank=T.slice().sort(function(a,b){return a.pf-b.pf}).indexOf(byLuck[0])+1,low=byLuck.filter(function(t){return t.luck===byLuck[byLuck.length-1].luck});
 h.push('<li>Scraping by: '+who(byLuck[0])+' is '+rec(byLuck[0].w,byLuck[0].l,byLuck[0].t)+' ('+sg(byLuck[0].luck,1)+' wins above expected) with the '+(pfRank===1?'fewest':ord(pfRank)+'-fewest')+' points scored; opponents scored '+f1(byLuck[0].dip)+' points a week below their own average against them.</li>');
-h.push('<li>Robbed on the scoreboard: '+joinNames(low.map(who))+' '+(low.length>1?'are each ':'is ')+sg(low[0].luck,1)+' wins below expected.</li>');
-h.push('<li>Hit hardest by injuries: '+who(byBill[0])+': '+byBill[0].inj_games+' games missed by their draft picks, '+byBill[0].inj_early+' of them by picks from rounds 1 to 5.</li>');
-if(worstP)h.push('<li>Costliest absence: '+esc(worstP.name)+' (pick '+worstP.pick+', '+nm(worstP.rid)+') missed '+worstP.missed.length+' game'+(worstP.missed.length>1?"s":"")+'.</li>');
+h.push('<li>Robbed on the scoreboard: '+joinNames(low.map(who))+' '+(low.length>1?'are each ':'is ')+f1(-low[0].luck)+' wins below expected.</li>');
+h.push('<li>Hit hardest by injuries: '+who(byBill[0])+': '+f1(byBill[0].inj_bill)+' injury bill, '+gms(byBill[0].inj_games_so)+' missed so far and '+gms(byBill[0].inj_games_co)+' still to miss.</li>');
+h.push('<li>Worst still to come: '+who(byCo[0])+' will lose '+f1(byCo[0].inj_bill_co)+' more in draft capital from players already ruled out for week '+cw+' or out long term.</li>');
+if(worstP)h.push('<li>Costliest absence: '+esc(worstP.name)+' (pick '+worstP.pick+', '+ch(worstP)+'): '+gms(worstP.missed.length)+' missed'+(worstP.coming.length?' and '+gms(worstP.coming.length)+' still to miss'+(worstP.lt?' ('+esc(worstP.lt.timeline.toLowerCase())+')':''):'')+'.</li>');
 h.push('</ul></section>');
 
 /* ---- luck index table */
 var li=tiers(T.map(function(t){return t.idx}),true),lw=tiers(T.map(function(t){return t.luck}),true),lb=tiers(T.map(function(t){return t.inj_bill}),false),ld=tiers(T.map(function(t){return t.dip}),true);
-h.push('<section><h2>Luck index</h2><p class="cap">Ranked luckiest to unluckiest. Color is relative to the 12 teams: green is lucky, red is unlucky.</p><div class="scroll"><table><thead><tr><th>Rank</th><th>Team</th><th>Manager</th><th>Record</th><th>Expected wins</th><th>Wins above expected</th><th>All-play</th><th>Points for</th><th>Points against</th><th>Opponent dip</th><th>Injury bill</th><th>Luck index</th></tr></thead><tbody>');
-T.forEach(function(t,i){h.push('<tr'+(t.rid===D.me?' class="me"':'')+'><td>'+t.rank+'</td><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+f1(t.xw)+'</td><td>'+pill(sg(t.luck,1),lw[i])+'</td><td>'+rec(t.apw,t.apl,t.apt)+'</td><td>'+f1(t.pf)+'</td><td>'+f1(t.pa)+'</td><td>'+pill(sg(t.dip,1),ld[i])+'</td><td>'+pill(f1(t.inj_bill),lb[i])+'</td><td>'+pill(sg(t.idx,2),li[i])+'</td></tr>')});
+h.push('<section><h2>Luck index</h2><p class="cap">Ranked luckiest to unluckiest. Color is relative to the 12 teams: green is lucky, red is unlucky.</p><div class="scroll"><table><thead><tr><th>Rank</th><th>Team</th><th>Manager</th><th>Record</th><th>Expected wins</th><th>Wins above expected</th><th>All-play</th><th>Points for</th><th>Points against</th><th>Opponent dip</th><th>Injury pain so far</th><th>Pain still coming</th><th>Injury bill</th><th>Luck index</th></tr></thead><tbody>');
+T.forEach(function(t,i){h.push('<tr'+(t.rid===D.me?' class="me"':'')+'><td>'+t.rank+'</td><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+f1(t.xw)+'</td><td>'+pill(sg(t.luck,1),lw[i])+'</td><td>'+rec(t.apw,t.apl,t.apt)+'</td><td>'+f1(t.pf)+'</td><td>'+f1(t.pa)+'</td><td>'+pill(sg(t.dip,1),ld[i])+'</td><td>'+f1(t.inj_bill_so)+'</td><td>'+f1(t.inj_bill_co)+'</td><td>'+pill(f1(t.inj_bill),lb[i])+'</td><td>'+pill(sg(t.idx,2),li[i])+'</td></tr>')});
 h.push('</tbody></table></div></section>');
 
 /* ---- injuries */
 var max=byBill[0].inj_bill||1,bt=tiers(byBill.map(function(t){return t.inj_bill}),false);
-h.push('<section><h2>Injury report: who got screwed</h2><p class="cap">Injury bill = games missed by a team\u2019s draft picks, each weighted by where the player was drafted (pick 1 = 100, each later pick worth 3% less). Charged to the team that drafted the player.</p><div class="bars">');
-byBill.forEach(function(t,i){h.push('<div class="bar"><span class="bl">'+esc(t.name)+'</span><span class="bt"><span class="bf '+bt[i]+'" style="width:'+Math.max(2,t.inj_bill/max*100).toFixed(1)+'%"></span></span><span class="bv">'+f1(t.inj_bill)+'</span></div>')});
-h.push('</div><div class="scroll mt"><table><thead><tr><th>Team</th><th>Manager</th><th>Games missed</th><th>By round 1\u20135 picks</th><th>Injury bill</th><th>Costliest absence</th></tr></thead><tbody>');
-byBill.forEach(function(t,i){var w=t.inj_worst;h.push('<tr'+(t.rid===D.me?' class="me"':'')+'><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+t.inj_games+'</td><td>'+t.inj_early+'</td><td>'+pill(f1(t.inj_bill),bt[i])+'</td><td>'+(w?esc(w.name)+' (pick '+w.pick+', '+w.games+' game'+(w.games>1?'s':'')+')':'\u2014')+'</td></tr>')});
+h.push('<section><h2>Injury report: who got screwed</h2><p class="cap">Injury bill = games missed, each weighted by where the player was drafted (pick 1 = 100, each later pick worth 3% less). Each game is charged to the team that held the player that week. Still coming = week '+cw+' games he is already ruled out of, plus reported long-term absences through week '+endw+'.</p>');
+h.push('<div class="lg"><span><i></i>So far</span><span><i class="c"></i>Still coming</span></div><div class="bars stk">');
+byBill.forEach(function(t,i){h.push('<div class="bar"><span class="bl">'+esc(t.name)+'</span><span class="bt"><span class="bf '+bt[i]+'" style="width:'+(t.inj_bill_so/max*100).toFixed(1)+'%"></span><span class="bc '+bt[i]+'" style="width:'+(t.inj_bill_co/max*100).toFixed(1)+'%"></span></span><span class="bv">'+f1(t.inj_bill)+'</span></div>')});
+h.push('</div><div class="scroll mt"><table><thead><tr><th>Team</th><th>Manager</th><th>Games missed</th><th>Games still to miss</th><th>By round 1\u20135 picks</th><th>Pain so far</th><th>Still coming</th><th>Injury bill</th><th>Costliest absence</th></tr></thead><tbody>');
+byBill.forEach(function(t,i){var w=t.inj_worst;h.push('<tr'+(t.rid===D.me?' class="me"':'')+'><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+t.inj_games_so+'</td><td>'+t.inj_games_co+'</td><td>'+t.inj_early+'</td><td>'+f1(t.inj_bill_so)+'</td><td>'+f1(t.inj_bill_co)+'</td><td>'+pill(f1(t.inj_bill),bt[i])+'</td><td>'+(w?esc(w.name)+' (pick '+w.pick+', '+gms(w.games)+')':'\u2014')+'</td></tr>')});
 h.push('</tbody></table></div>');
 var P=D.players.slice(0,15),pt=tiers(P.map(function(p){return p.bill}),false);
-h.push('<h3>Costliest absences</h3><p class="cap">The 15 drafted players with the biggest draft-capital loss. Sleeper tag now is the player\u2019s injury tag today (blank once he is off the report).</p><div class="scroll"><table><thead><tr><th>Pick</th><th>Player</th><th>Drafted by</th><th>Weeks missed</th><th>Games</th><th>Pick value</th><th>Draft capital lost</th><th>Sleeper tag now</th></tr></thead><tbody>');
-P.forEach(function(p,i){h.push('<tr><td>'+p.rnd+'.'+String(p.pick-(p.rnd-1)*12).padStart(2,"0")+' (#'+p.pick+')</td><td>'+esc(p.name)+' <span class="mgr">'+esc(p.pos)+'</span></td><td>'+nm(p.rid)+'</td><td>'+p.missed.join(", ")+'</td><td>'+p.missed.length+'</td><td>'+f1(p.val)+'</td><td>'+pill(f1(p.bill),pt[i])+'</td><td>'+(p.kind==="not injury"?esc(p.status)+'; not counted':esc(p.status)||'\u2014')+'</td></tr>')});
-h.push('</tbody></table></div></section>');
+h.push('<h3>Costliest absences</h3><p class="cap">The 15 drafted players with the biggest draft-capital loss, so far plus still coming. Charged to lists every team that held him for a missed game. Sleeper tag now is today\u2019s injury tag.</p><div class="scroll"><table><thead><tr><th>Pick</th><th>Player</th><th>Drafted by</th><th>Charged to</th><th>Weeks missed</th><th>Still to miss</th><th>Pick value</th><th>Draft capital lost</th><th>Sleeper tag now</th></tr></thead><tbody>');
+P.forEach(function(p,i){h.push('<tr><td>'+p.rnd+'.'+String(p.pick-(p.rnd-1)*12).padStart(2,"0")+' (#'+p.pick+')</td><td>'+esc(p.name)+' <span class="mgr">'+esc(p.pos)+'</span></td><td>'+nm(p.rid)+'</td><td>'+ch(p)+'</td><td>'+(p.missed.join(", ")||'\u2014')+'</td><td>'+(p.coming.length?'Wk '+p.coming.join(", "):'\u2014')+'</td><td>'+f1(p.val)+'</td><td>'+pill(f1(p.bill),pt[i])+'</td><td>'+(p.kind==="not injury"?esc(p.status)+'; not counted':esc(p.status)||'\u2014')+'</td></tr>')});
+h.push('</tbody></table></div>');
+
+/* long-term injuries */
+var LT=IP.filter(function(p){return p.lt}).sort(function(a,b){return b.bill_co-a.bill_co||a.pick-b.pick});
+h.push('<h3>Long-term injuries</h3><p class="cap">Reported timelines, checked Oct 31. Still to miss counts his NFL team\u2019s games through week '+endw+' (the end of our regular season) before the estimated return.</p><div class="scroll"><table><thead><tr><th>Player</th><th>Charged to</th><th>Injury</th><th>Reported timeline</th><th>Our estimate</th><th>Still to miss</th><th>Still coming</th><th>Sources</th></tr></thead><tbody>');
+LT.forEach(function(p){var c=p.charged.filter(function(x){return x[2]}).map(function(x){return nm(x[0])}).join(', ')||nm(p.now||p.rid);
+var est=p.lt.back==="season"?'Out through week '+endw:'Back '+esc(p.lt.back.replace(/^2026-(\d\d)-(\d\d)$/,function(m,a,b){return ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+a]+" "+(+b)}));
+h.push('<tr><td>'+esc(p.name)+' <span class="mgr">'+esc(p.pos)+' #'+p.pick+'</span></td><td>'+c+(p.now?'':' <span class="mgr">(dropped)</span>')+'</td><td>'+esc(p.lt.injury)+'</td><td>'+esc(p.lt.timeline)+'</td><td>'+est+' <span class="mgr">'+esc(p.lt.basis)+'</span></td><td>'+(p.coming.length?gms(p.coming.length):'0')+'</td><td>'+f1(p.bill_co)+'</td><td class="src">'+p.lt.sources.map(function(u,i){var d=u.replace(/^https?:\/\/(www\.)?/,"").split("/")[0];return '<a href="'+esc(u)+'" target="_blank" rel="noopener">'+esc(d)+'</a>'}).join("")+'</td></tr>')});
+h.push('</tbody></table></div>');
+
+/* trades */
+var TR=(D.trades||[]).map(function(t){var p=IP.filter(function(x){return x.pid===t.pid})[0],f=0,g=0;
+p.charged.forEach(function(c){if(c[0]===t.frm)f+=c[1]+c[2];if(c[0]===t.to)g+=c[1]+c[2]});return {t:t,p:p,f:f,g:g}}).filter(function(x){return x.f||x.g});
+if(TR.length){h.push('<h3>Trades that moved injury pain</h3><p class="cap">Traded players who missed games. A miss stays with the team that held him that week.</p><div class="scroll"><table><thead><tr><th>Week</th><th>Player</th><th>From</th><th>To</th><th>Misses on the old team</th><th>Misses on the new team</th></tr></thead><tbody>');
+TR.forEach(function(x){h.push('<tr><td>'+x.t.week+'</td><td>'+esc(x.p.name)+' <span class="mgr">#'+x.p.pick+'</span></td><td>'+nm(x.t.frm)+'</td><td>'+nm(x.t.to)+'</td><td>'+x.f+'</td><td>'+x.g+'</td></tr>')});
+h.push('</tbody></table></div>')}
+h.push('</section>');
 
 /* ---- schedule luck: scatter + close games */
 h.push('<section><h2>Points for vs points against</h2><p class="cap">Bottom right is the dream (score a lot, face little); top left is pain. Dashed lines are league averages. Dot color is wins above expected (green lucky, red unlucky).</p>'+scatter(T,lw)+'</section>');
@@ -72,6 +93,9 @@ var A=[];
 var g1=top("luck",true);A.push(["Golden Horseshoe","Most wins above expected",names(g1)+": "+sg(g1[0].luck,1)+" wins, "+rec(g1[0].w,g1[0].l,g1[0].t)+" with an all-play record of "+rec(g1[0].apw,g1[0].apl,g1[0].apt)+"."]);
 var g2=top("luck",false);A.push(["Broken Mirror","Fewest wins above expected",names(g2)+": "+sg(g2[0].luck,1)+" wins."]);
 var g3=top("inj_bill",true);A.push(["Ambulance on Speed Dial","Biggest injury bill",names(g3)+": "+f1(g3[0].inj_bill)+" ("+g3[0].inj_games+" games missed)."]);
+var gc=top("inj_bill_co",true);A.push(["Dark Clouds Ahead","Most injury pain still coming",names(gc)+": "+f1(gc[0].inj_bill_co)+" ("+gc[0].inj_games_co+" games still to miss)."]);
+var dg={};TR.forEach(function(x){dg[x.t.to]=(dg[x.t.to]||0)+x.g});var dk=Object.keys(dg).filter(function(k){return dg[k]}).sort(function(a,b){return dg[b]-dg[a]});
+if(dk.length){var dm=dg[dk[0]],dw=dk.filter(function(k){return dg[k]===dm});A.push(["Damaged Goods","Most missed games by players acquired in trades",joinNames(dw.map(function(k){return "<b>"+nm(+k)+"</b>"}))+": "+dm+"."])}
 var g4=top("inj_bill",false);A.push(["Bubble Wrap","Smallest injury bill",names(g4)+": "+f1(g4[0].inj_bill)+" ("+g4[0].inj_games+" games missed)."]);
 var g5=top("dip",true);A.push(["Soft Landing","Opponents played worst against them",names(g5)+": opponents scored "+f1(g5[0].dip)+" a week below their own average."]);
 var g6=top("pa",true);A.push(["The Gauntlet","Most points against",names(g6)+": "+f1(g6[0].pa)+" against."]);
@@ -88,13 +112,16 @@ h.push('</div></section>');
 /* ---- methodology */
 var tagged=[0,0];D.players.forEach(function(p){if(p.kind==='not injury')return;tagged[1]+=p.missed.length;if(p.kind==='injured')tagged[0]+=p.missed.length});
 h.push('<section><h2>Methodology</h2><ul class="meth">'+
-'<li><b>Data:</b> Sleeper only: league matchups, draft picks, rosters and users, weekly NFL stats, the NFL schedule and the players file. '+wk+' (completed weeks only).</li>'+
+'<li><b>Data:</b> Sleeper only: league matchups, draft picks, rosters and users, weekly NFL stats, the NFL schedule and the players file, plus news reports for long-term injury timelines. Records and scores use '+wk.toLowerCase()+' (completed weeks).</li>'+
 '<li><b>Expected wins:</b> each week, a team\u2019s share of the other 11 teams it outscored (its all-play result), summed over the weeks. Wins above expected = actual wins minus expected wins (ties count half).</li>'+
 '<li><b>Opponent dip:</b> per game, the opponent\u2019s average in his other weeks minus what he scored against you, averaged. Positive means opponents underperformed against you.</li>'+
 '<li><b>Missed game:</b> a drafted player whose NFL team played that week but who did not play (no game played in Sleeper\u2019s stats). Byes and players with no NFL team are not counted. Known non-injury absences (a coach\u2019s decision) are excluded.</li>'+
-'<li><b>Injury bill:</b> missed games times pick value, where pick value = 100 \u00d7 0.97^(pick \u2212 1) (pick 12 \u2248 72, pick 36 \u2248 34, pick 100 \u2248 5). Charged to the team that drafted the player, even if he was later traded or dropped.</li>'+
-'<li><b>Luck index:</b> the average of two z-scores across the 12 teams: wins above expected, and the injury bill (reversed, so a small bill is lucky).</li>'+
-'<li><b>Caveat:</b> Sleeper keeps no week-by-week injury history, so the cause of each miss isn\u2019t confirmed; '+tagged[0]+' of the '+tagged[1]+' counted missed games belong to players who still carry a Sleeper injury tag.</li></ul></section>');
+'<li><b>Trades and drops:</b> each missed game is charged to the team holding the player that week (Sleeper\u2019s weekly rosters). If nobody held him, it goes to the last team that did. Pick value always comes from the original draft pick.</li>'+
+'<li><b>Week '+cw+':</b> games already played count as above. For games not played yet, players Sleeper lists as Out, IR or PUP count as missed; Questionable and Doubtful do not.</li>'+
+'<li><b>Still coming:</b> only for players with a reported timeline (sources in the long-term table), counting his team\u2019s games through week '+endw+', our last regular-season week. Ranges use the midpoint; \u201cearliest return\u201d dates are taken as the return. With no reported timeline, only this week\u2019s Sleeper status counts.</li>'+
+'<li><b>Injury bill:</b> missed games (so far plus still coming) times pick value, where pick value = 100 \u00d7 0.97^(pick \u2212 1) (pick 12 \u2248 72, pick 36 \u2248 34, pick 100 \u2248 5).</li>'+
+'<li><b>Luck index:</b> the average of two z-scores across the 12 teams: wins above expected, and the full injury bill (reversed, so a small bill is lucky).</li>'+
+'<li><b>Caveat:</b> Sleeper keeps no week-by-week injury history, so the cause of past misses isn\u2019t confirmed; '+tagged[0]+' of the '+tagged[1]+' counted missed games belong to players who still carry a Sleeper injury tag. Return dates are estimates and will move.</li></ul></section>');
 return h.join("");
 }
 
