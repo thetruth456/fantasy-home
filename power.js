@@ -47,11 +47,11 @@ h.push('<li>Schedule left: easiest for '+who(e0)+' ('+sg(se(e0))+' playoff pts),
 h.push('</ul></section>');
 
 /* ---- power table */
-var tS=tiers(T.map(function(t){return t.strength}),true),tP=tiers(T.map(function(t){return t.power}),true);
+var tS=tiers(T.map(function(t){return t.strength}),true);
 var pw=D.pw;
-h.push('<section><h2>Power rankings</h2><p class="cap">Power score = '+Math.round(pw.strength*100)+'% team strength (chance to beat a random league opponent each week, weeks '+(D.cur+1)+'\u2013'+D.reg_end+') + '+Math.round(pw.playoff*100)+'% playoff odds + '+Math.round(pw.first*100)+'% odds of finishing 1st + '+Math.round(pw.title*100)+'% title odds, all 0\u2013100. Odds come from '+D.sims.toLocaleString("en-US")+' simulated seasons.</p>');
-h.push('<div class="scroll"><table><thead><tr><th>Rank</th><th>Team</th><th>Manager</th><th>Record</th><th>Points for</th><th>Strength (pts/wk)</th><th>Proj. record</th><th>Playoff %</th><th>1st place %</th><th>Title %</th><th>Power score</th><th>Note</th></tr></thead><tbody>');
-T.forEach(function(t,i){h.push('<tr><td>'+t.rank+'</td><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+f1(t.pf)+'</td><td>'+pill(f1(t.strength),tS[i])+'</td><td>'+pr(t)+'</td><td>'+pill(pc(t.playoff),ptier(t.playoff,67,33))+'</td><td>'+pill(pc(t.first),ptier(t.first,20,5))+'</td><td>'+pill(pc(t.title),ptier(t.title,15,5))+'</td><td>'+pill(f1(t.power),tP[i])+'</td><td class="nt">'+note(t)+'</td></tr>')});
+h.push('<section><h2>Power rankings</h2><p class="cap">Ranked by a blend of team strength ('+Math.round(pw.strength*100)+'%: chance to beat a random league opponent each week, weeks '+(D.cur+1)+'\u2013'+D.reg_end+'), playoff odds ('+Math.round(pw.playoff*100)+'%), odds of finishing 1st ('+Math.round(pw.first*100)+'%) and title odds ('+Math.round(pw.title*100)+'%). Odds come from '+D.sims.toLocaleString("en-US")+' simulated seasons.</p>');
+h.push('<div class="scroll"><table><thead><tr><th>Rank</th><th>Team</th><th>Manager</th><th>Record</th><th>Points for</th><th>Strength (pts/wk)</th><th>Proj. record</th><th>Playoff %</th><th>1st place %</th><th>Title %</th><th>Note</th></tr></thead><tbody>');
+T.forEach(function(t,i){h.push('<tr><td>'+t.rank+'</td><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+f1(t.pf)+'</td><td>'+pill(f1(t.strength),tS[i])+'</td><td>'+pr(t)+'</td><td>'+pill(pc(t.playoff),ptier(t.playoff,67,33))+'</td><td>'+pill(pc(t.first),ptier(t.first,20,5))+'</td><td>'+pill(pc(t.title),ptier(t.title,15,5))+'</td><td class="nt">'+note(t)+'</td></tr>')});
 h.push('</tbody></table></div></section>');
 
 /* ---- projected finish */
