@@ -15,6 +15,8 @@ function rec(w,l,t){return w+"-"+l+(t?"-"+t:"")}
 function ord(n){return n+(n%100>10&&n%100<14?'th':['th','st','nd','rd'][n%10]||'th')}
 function ptTime(iso){try{return new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(iso))+" PT"}catch(e){return iso}}
 
+/* Ben's (podcast co-host) rankings, keyed by Sleeper roster_id */
+var BEN={4:1,10:2,2:3,8:4,11:5,12:6,6:7,1:8,3:9,5:10,9:11,7:12};
 window.buildPower=function(D){
 var T=D.teams,by={};T.forEach(function(t){by[t.rid]=t});
 function who(t){return '<b>'+esc(t.name)+'</b> <span class="mgr">'+esc(t.user)+'</span>'}
@@ -49,9 +51,9 @@ h.push('</ul></section>');
 /* ---- power table */
 var tS=tiers(T.map(function(t){return t.strength}),true);
 var pw=D.pw;
-h.push('<section><h2>Power rankings</h2><p class="cap">Ranked by a blend of team strength ('+Math.round(pw.strength*100)+'%: chance to beat a random league opponent each week, weeks '+(D.cur+1)+'\u2013'+D.reg_end+'), playoff odds ('+Math.round(pw.playoff*100)+'%), odds of finishing 1st ('+Math.round(pw.first*100)+'%) and title odds ('+Math.round(pw.title*100)+'%). Odds come from '+D.sims.toLocaleString("en-US")+' simulated seasons.</p>');
-h.push('<div class="scroll"><table><thead><tr><th>Rank</th><th>Team</th><th>Manager</th><th>Record</th><th>Points for</th><th>Strength (pts/wk)</th><th>Proj. record</th><th>Playoff %</th><th>1st place %</th><th>Title %</th><th>Note</th></tr></thead><tbody>');
-T.forEach(function(t,i){h.push('<tr><td>'+t.rank+'</td><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+f1(t.pf)+'</td><td>'+pill(f1(t.strength),tS[i])+'</td><td>'+pr(t)+'</td><td>'+pill(pc(t.playoff),ptier(t.playoff,67,33))+'</td><td>'+pill(pc(t.first),ptier(t.first,20,5))+'</td><td>'+pill(pc(t.title),ptier(t.title,15,5))+'</td><td class="nt">'+note(t)+'</td></tr>')});
+h.push('<section><h2>Power rankings</h2><p class="cap">Ranked by a blend of team strength ('+Math.round(pw.strength*100)+'%: chance to beat a random league opponent each week, weeks '+(D.cur+1)+'\u2013'+D.reg_end+'), playoff odds ('+Math.round(pw.playoff*100)+'%), odds of finishing 1st ('+Math.round(pw.first*100)+'%) and title odds ('+Math.round(pw.title*100)+'%). Odds come from '+D.sims.toLocaleString("en-US")+' simulated seasons. Ben\u2019s rank is Ben\u2019s own list.</p>');
+h.push('<div class="scroll"><table><thead><tr><th>Rank</th><th>Ben\u2019s rank</th><th>Team</th><th>Manager</th><th>Record</th><th>Points for</th><th>Strength (pts/wk)</th><th>Proj. record</th><th>Playoff %</th><th>1st place %</th><th>Title %</th><th>Note</th></tr></thead><tbody>');
+T.forEach(function(t,i){h.push('<tr><td>'+t.rank+'</td><td>'+(BEN[t.rid]||'\u2013')+'</td><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+f1(t.pf)+'</td><td>'+pill(f1(t.strength),tS[i])+'</td><td>'+pr(t)+'</td><td>'+pill(pc(t.playoff),ptier(t.playoff,67,33))+'</td><td>'+pill(pc(t.first),ptier(t.first,20,5))+'</td><td>'+pill(pc(t.title),ptier(t.title,15,5))+'</td><td class="nt">'+note(t)+'</td></tr>')});
 h.push('</tbody></table></div></section>');
 
 /* ---- projected finish */
