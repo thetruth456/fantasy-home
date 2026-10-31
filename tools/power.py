@@ -3,9 +3,12 @@
 Not run by the update workflow. Writes best-power-data.js (window.POWER.best). Stdlib only.
 Usage: python tools/power.py [sims]   (default 10000)
 Model (also summarized on the page):
-  weekly mean = 50% season points per game (weeks scored so far) + 50% Sleeper's projection for the team's best
-  legal lineup from its current roster that week (projections scaled so the league average matches real scoring).
-  Long-term injuries come from LONG_TERM in tools/podcast.py; this week's Out/IR/PUP tags count as zero.
+  each rostered player's weekly value = 50% his Sleeper projection for that week + 50% his own 2026 points per game
+  played (projection only if he has played fewer than MIN_GP games). Team weekly mean = best legal lineup from the
+  CURRENT roster on those values, scaled so the league average matches real scoring. So production by players who
+  are now hurt, traded or dropped no longer counts for anyone. A player counts as zero in a week when he has no
+  projection (bye, or Sleeper has him out), when LONG_TERM in tools/podcast.py has him out, or (this week only)
+  when Sleeper tags him Out/IR/PUP.
   This week (in progress): starters whose NFL game is final keep their real points; open slots use the best lineup
   from players who have not played yet. Weekly noise = the spread of real scores around each team's average.
   Standings: wins (ties = half), then points for. Playoffs: 6 teams, seeds 1-2 bye, fixed bracket.
@@ -19,7 +22,9 @@ LEAGUE = PC.LEAGUE
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(os.environ.get("FH_OUT_DIR") or ROOT, "best-power-data.js")
 CACHE = os.environ.get("FH_CACHE_DIR") or os.path.join(ROOT, ".cache")
-W_SEASON = 0.5            # weight on season points per game (rest = roster projection)
+W_SEASON = 0.5            # player level: weight on his 2026 points per game (rest = Sleeper projection)
+TAU = float(os.environ.get("FH_POWER_TAU", "0"))  # optional per-sim team-strength uncertainty (pts/wk); 0 = off
+MIN_GP = 2                # fewer games played than this -> projection only
 # Power score weights (0-100 scale each)
 PW = dict(strength=0.40, playoff=0.30, first=0.15, title=0.15)
 FLEX = {"FLEX": {"RB", "WR", "TE"}, "SUPER_FLEX": {"QB", "RB", "WR", "TE"}, "REC_FLEX": {"WR", "TE"}, "WRRB_FLEX": {"RB", "WR"}}
@@ -119,6 +124,21 @@ def main():
             return 0.0
         return max(0.0, fpts(e.get("stats") or {}))
 
+    # 2026 points per game played, per player (league scoring)
+    pg = {}
+    for w in range(1, last + 1):
+        for e in S.sleeper_stats(season, w, "regular"):
+            st_ = e.get("stats") or {}
+            if e.get("player_id") and st_.get("gp"):
+                t = pg.setdefault(e["player_id"], [0, 0.0]); t[0] += 1; t[1] += fpts(st_)
+
+    def val(pid, w):
+        b = ppts(pid, w)
+        if b <= 0:          # no projection (bye / Sleeper has him out), LONG_TERM out, or ruled out this week
+            return 0.0
+        g = pg.get(pid)
+        return W_SEASON * max(0.0, g[1] / g[0]) + (1 - W_SEASON) * b if g and g[0] >= MIN_GP else b
+
     def pos(pid):
         return (P.get(pid) or {}).get("position") or ""
 
@@ -131,7 +151,7 @@ def main():
     mcur = {m["roster_id"]: m for m in M[cur]}
     for r in rids:
         for w in range(cur + 1, end + 1):
-            raw[w][r] = lineup(slots, [(ppts(p, w), pos(p), p) for p in team[r]["players"]])[0]
+            raw[w][r] = lineup(slots, [(val(p, w), pos(p), p) for p in team[r]["players"]])[0]
         # this week: lock starters whose game is final (or live), refill the rest from players yet to play
         m = mcur[r]
         sp = dict(zip(m.get("starters") or [], m.get("starters_points") or []))
@@ -140,7 +160,7 @@ def main():
             if pid and pid != "0" and ((cur, nfl(pid, cur)) in done or (cur, nfl(pid, cur)) in live):
                 lk += sp.get(pid) or 0.0
                 free.remove(slots[i])
-        avail = [(ppts(p, cur), pos(p), p) for p in team[r]["players"]
+        avail = [(val(p, cur), pos(p), p) for p in team[r]["players"]
                  if (cur, nfl(p, cur)) not in done and (cur, nfl(p, cur)) not in live]
         locked[r] = lk
         rem[r] = lineup(free, avail)[0]
@@ -150,14 +170,11 @@ def main():
     mu = {w: {} for w in range(cur, end + 1)}
     for w in range(cur, end + 1):
         for r in rids:
-            mu[w][r] = W_SEASON * ppg[r] + (1 - W_SEASON) * k * raw[w][r]
-    sdw = {w: sd for w in mu}
+            mu[w][r] = k * raw[w][r]
     frac = {}
     for r in rids:  # in-progress week: real points already banked, less noise left
-        full = mu[cur][r]
-        mu[cur][r] = max(locked[r], full)
-        tot = locked[r] + rem[r]
-        frac[r] = rem[r] / tot if tot else 1.0
+        mu[cur][r] = locked[r] + k * rem[r]
+        frac[r] = k * rem[r] / mu[cur][r] if mu[cur][r] else 1.0
     strength = {r: sum(mu[w][r] for w in fut) / len(fut) for r in rids}
     ap = {r: 100 * sum(phi((mu[w][r] - mu[w][o]) / (sd * math.sqrt(2))) for w in fut for o in rids if o != r) / (len(fut) * (len(rids) - 1)) for r in rids}
 
@@ -168,43 +185,59 @@ def main():
             sched_left[a].append((w, b)); sched_left[b].append((w, a))
 
     # ---------------- Monte Carlo
-    rng = random.Random(20261031)
-    seedc = {r: [0] * nplay for r in rids}
-    finc = {r: [0] * len(rids) for r in rids}
-    title, final, wins_sum = {r: 0 for r in rids}, {r: 0 for r in rids}, {r: 0.0 for r in rids}
     PR = {w: pairs(w) for w in range(cur, reg_end + 1)}
-    for _ in range(sims):
-        W = {r: rec[r]["w"] + 0.5 * rec[r]["t"] for r in rids}
-        F = {r: rec[r]["pf"] for r in rids}
-        for w in range(cur, reg_end + 1):
-            sc = {r: rng.gauss(mu[w][r], sd * (math.sqrt(frac[r]) if w == cur else 1)) for r in rids}
-            for a, b in PR[w]:
-                F[a] += sc[a]; F[b] += sc[b]
-                if sc[a] > sc[b]: W[a] += 1
-                elif sc[b] > sc[a]: W[b] += 1
-                else: W[a] += .5; W[b] += .5
-        order = sorted(rids, key=lambda r: (-W[r], -F[r]))
-        for i, r in enumerate(order):
-            finc[r][i] += 1; wins_sum[r] += W[r]
-            if i < nplay: seedc[r][i] += 1
-        s = order[:nplay]
 
-        def g(a, b, w):
-            x, y = rng.gauss(mu[w][a], sd), rng.gauss(mu[w][b], sd)
-            return a if x >= y else b
-        q1, q2 = g(s[3], s[4], pstart), g(s[2], s[5], pstart)
-        f1, f2 = g(s[0], q1, pstart + 1), g(s[1], q2, pstart + 1)
-        final[f1] += 1; final[f2] += 1
-        title[g(f1, f2, pstart + 2)] += 1
+    def simulate(rng, pairfn, n, playoffs):
+        seedc = {r: [0] * nplay for r in rids}
+        finc = {r: [0] * len(rids) for r in rids}
+        title, final, wins_sum = {r: 0 for r in rids}, {r: 0 for r in rids}, {r: 0.0 for r in rids}
+        for _ in range(n):
+            W = {r: rec[r]["w"] + 0.5 * rec[r]["t"] for r in rids}
+            F = {r: rec[r]["pf"] for r in rids}
+            off = {r: rng.gauss(0, TAU) if TAU else 0.0 for r in rids}
+            for w in range(cur, reg_end + 1):
+                sc = {r: rng.gauss(mu[w][r] + (off[r] if w > cur else frac[r] * off[r]), sd * (math.sqrt(frac[r]) if w == cur else 1)) for r in rids}
+                for a, b in pairfn(w):
+                    F[a] += sc[a]; F[b] += sc[b]
+                    if sc[a] > sc[b]: W[a] += 1
+                    elif sc[b] > sc[a]: W[b] += 1
+                    else: W[a] += .5; W[b] += .5
+            order = sorted(rids, key=lambda r: (-W[r], -F[r]))
+            for i, r in enumerate(order):
+                finc[r][i] += 1; wins_sum[r] += W[r]
+                if i < nplay: seedc[r][i] += 1
+            if not playoffs:
+                continue
+            s_ = order[:nplay]
+
+            def g(a, b, w):
+                x, y = rng.gauss(mu[w][a] + off[a], sd), rng.gauss(mu[w][b] + off[b], sd)
+                return a if x >= y else b
+            # Sleeper's winners bracket (fixed, no reseeding): 4v5 and 3v6, then 1 v (4/5) and 2 v (3/6)
+            q1, q2 = g(s_[3], s_[4], pstart), g(s_[2], s_[5], pstart)
+            f1, f2 = g(s_[0], q1, pstart + 1), g(s_[1], q2, pstart + 1)
+            final[f1] += 1; final[f2] += 1
+            title[g(f1, f2, pstart + 2)] += 1
+        return seedc, finc, title, final, wins_sum
+    seedc, finc, title, final, wins_sum = simulate(random.Random(20261031), lambda w: PR[w], sims, True)
+
+    # same model on a neutral schedule (random opponents every remaining week) -> schedule effect
+    nrng = random.Random(7)
+
+    def rand_pairs(w):
+        o = rids[:]; nrng.shuffle(o)
+        return [(o[i], o[i + 1]) for i in range(0, len(o), 2)]
+    nseed = simulate(random.Random(20261101), rand_pairs, sims, False)[0]
     rows = []
     for r in rids:
         t, R = team[r], rec[r]
         po = sum(seedc[r]) / sims * 100
         rows.append(dict(rid=r, name=t["name"], user=t["user"], w=R["w"], l=R["l"], t=R["t"], pf=round(R["pf"], 1), pa=round(R["pa"], 1),
-                         ppg=round(ppg[r], 1), proj=round(k * sum(raw[w][r] for w in fut) / len(fut), 1), strength=round(strength[r], 1), ap=round(ap[r], 1),
+                         ppg=round(ppg[r], 1), proj=round(sum(lineup(slots, [(ppts(p, w), pos(p), p) for p in team[r]["players"]])[0] for w in fut) / len(fut), 1), strength=round(strength[r], 1), ap=round(ap[r], 1),
                          pwins=round(wins_sum[r] / sims, 2), games=reg_end,
                          playoff=round(po, 1), first=round(seedc[r][0] / sims * 100, 1), bye=round((seedc[r][0] + seedc[r][1]) / sims * 100, 1),
-                         final=round(final[r] / sims * 100, 1), title=round(title[r] / sims * 100, 1),
+                         final=round(final[r] / sims * 100, 1),
+                         po_neutral=round(sum(nseed[r]) / sims * 100, 1), first_neutral=round(nseed[r][0] / sims * 100, 1), title=round(title[r] / sims * 100, 1),
                          seeds=[round(c / sims * 100, 1) for c in seedc[r]], finish=[round(c / sims * 100, 1) for c in finc[r]],
                          avgfin=round(sum((i + 1) * c for i, c in enumerate(finc[r])) / sims, 2),
                          wk=dict(locked=round(locked[r], 1), mu=round(mu[cur][r], 1)),

@@ -40,7 +40,10 @@ h.push('<section class="quick"><h2>The headlines</h2><ul>');
 h.push('<li>No. 1: '+who(top)+', '+rec(top.w,top.l,top.t)+', '+pc(top.playoff)+' to make the playoffs, '+pc(top.title)+' to win it all.</li>');
 if(hole)h.push('<li>Best roster in a hole: '+who(hole)+', '+ord(byAp.indexOf(hole)+1)+' in strength but '+rec(hole.w,hole.l,hole.t)+': '+pc(hole.playoff)+' playoff odds.</li>');
 h.push('<li>Bubble: '+who(bub)+', '+pc(bub.playoff)+'.</li>');
-h.push('<li>Schedule left: easiest for '+who(bySos[0])+', hardest for '+who(bySos[bySos.length-1])+'.</li>');
+function se(t){return t.playoff-t.po_neutral}
+function sg(v){var r=Math.round(v*10)/10;return (r>0?"+":r<0?"\u2212":"")+Math.abs(r).toFixed(1)}
+var e0=bySos[0],e1=bySos[bySos.length-1];
+h.push('<li>Schedule left: easiest for '+who(e0)+' ('+sg(se(e0))+' playoff pts), hardest for '+who(e1)+' ('+sg(se(e1))+').</li>');
 h.push('</ul></section>');
 
 /* ---- power table */
@@ -60,17 +63,17 @@ h.push('</div></section>');
 
 /* ---- schedule */
 var tO=tiers(bySos.map(function(t){return t.sos}),false);
-h.push('<section><h2>Remaining schedule: easiest to hardest</h2><p class="cap">Weeks '+D.cur+'\u2013'+D.reg_end+'. Opponent strength = each opponent\u2019s projected points in the week they meet.</p>');
-h.push('<div class="scroll"><table><thead><tr><th>Rank</th><th>Team</th><th>Record</th><th>Opp. strength (pts/wk)</th><th>Opp. record</th><th>Toughest game left</th></tr></thead><tbody>');
+h.push('<section><h2>Remaining schedule: easiest to hardest</h2><p class="cap">Weeks '+D.cur+'\u2013'+D.reg_end+'. Opponent strength = each opponent\u2019s projected points in the week they meet. Schedule effect = playoff % on the real schedule minus playoff % with random opponents each week.</p>');
+h.push('<div class="scroll"><table><thead><tr><th>Rank</th><th>Team</th><th>Record</th><th>Opp. strength (pts/wk)</th><th>Opp. record</th><th>Schedule effect (playoff pts)</th><th>Toughest game left</th></tr></thead><tbody>');
 bySos.forEach(function(t,i){var hard=t.left.slice().sort(function(a,b){return b.mu-a.mu})[0];
-h.push('<tr><td>'+(i+1)+'</td><td>'+esc(t.name)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+pill(f1(t.sos),tO[i])+'</td><td>'+t.opp_w+'-'+t.opp_l+'</td><td>Week '+hard.week+' vs '+esc(by[hard.opp].name)+'</td></tr>')});
+h.push('<tr><td>'+(i+1)+'</td><td>'+esc(t.name)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+pill(f1(t.sos),tO[i])+'</td><td>'+t.opp_w+'-'+t.opp_l+'</td><td>'+pill(sg(se(t)),se(t)>=1?"success":se(t)<=-1?"danger":"warning")+'</td><td>Week '+hard.week+' vs '+esc(by[hard.opp].name)+'</td></tr>')});
 h.push('</tbody></table></div></section>');
 
 /* ---- methodology */
 h.push('<section><h2>Methodology</h2><ul class="meth">'+
-'<li><b>Strength:</b> weekly projection = '+Math.round(D.w_season*100)+'% points per game so far (weeks 1\u2013'+D.last+') + '+Math.round((1-D.w_season)*100)+'% the best lineup from the current roster on Sleeper projections (byes, this week\u2019s Out/IR tags and long-term injuries count as zero).</li>'+
+'<li><b>Strength:</b> each player = '+Math.round(D.w_season*100)+'% his points per game this season + '+Math.round((1-D.w_season)*100)+'% his Sleeper projection that week; a team = its best lineup from the current roster, so points from players now hurt, traded or dropped don\u2019t count. Byes, this week\u2019s Out/IR tags and long-term injuries count as zero.</li>'+
 '<li><b>Simulation:</b> '+D.sims.toLocaleString("en-US")+' runs of weeks '+D.cur+'\u2013'+D.reg_end+' on the real schedule; each score varies by \u00b1'+f1(D.sd)+' pts (the real week-to-week spread). Week '+D.cur+' keeps points already scored.</li>'+
-'<li><b>Standings:</b> wins, then points for. Top '+D.nplay+' make it; seeds 1\u20132 get a bye; title odds simulate weeks '+D.pstart+'\u2013'+D.end+'.</li>'+
+'<li><b>Standings:</b> wins, then points for. Top '+D.nplay+' make it; seeds 1\u20132 get a bye; Sleeper\u2019s fixed bracket (no reseeding); title odds simulate weeks '+D.pstart+'\u2013'+D.end+'.</li>'+
 '<li><b>Caveat:</b> projections and injury timelines are estimates, and future trades and waiver moves aren\u2019t modeled. Data: Sleeper.</li></ul></section>');
 return h.join("");
 };
