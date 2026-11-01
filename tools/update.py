@@ -200,6 +200,7 @@ def main():
         META = dict(
             key=key, week=week, season=season, season_type=stype, league_id=m["league_id"], name=m["name"],
             title="%s Week %d: roster, waiver flex options and prop tiebreakers" % (m["name"], week),
+            lineup=m.get("lineup"),
             quick=build.quick_read(d),
             wcap=build.waiver_caption(d["WAIVER"]),
             setup=build.setup_text(m, week),

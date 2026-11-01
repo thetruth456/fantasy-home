@@ -122,3 +122,4 @@ tr.me td{background:var(--acc-soft)}
 .lg i.success{background:#2fa65a}.lg i.warning{background:#e0a400}
 td.nt{white-space:nowrap;color:var(--mut);font-size:13px}
 td.tw{white-space:normal;min-width:190px;max-width:360px}.inj{color:var(--mut);font-size:12px}
+.lineup{font-weight:700;padding:8px 12px;border-radius:10px;margin:-6px 0 16px;font-size:15px}.lineup.success:before{content:"\2713  "}.lineup.danger:before{content:"\26A0  "}

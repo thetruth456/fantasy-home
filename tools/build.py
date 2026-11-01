@@ -308,6 +308,7 @@ def build_league(ctx, bundle, user_id, props, fp, flex_page, prev_rows, prev_def
         log("WARNING: defense table failed (%s); keeping its previous rows" % e)
         defense = list(prev_def or [])
 
+    lineup = lineup_check(st, bn, labels, rp, me["starters"])
     s = me.get("settings", {})
     srt = sorted(R, key=lambda r: (-r["settings"].get("wins", 0), -(r["settings"].get("fpts", 0) + r["settings"].get("fpts_decimal", 0) / 100)))
     rank = [r["roster_id"] for r in srt].index(me["roster_id"]) + 1
@@ -316,7 +317,69 @@ def build_league(ctx, bundle, user_id, props, fp, flex_page, prev_rows, prev_def
     return dict(STARTERS=st, BENCH=bn, WAIVER=wv, DEFENSE=defense, meta=dict(
         name=L["name"], league_id=L["league_id"], teams=L["total_rosters"], season=L.get("season"),
         record=record, rank=rank, opponent=opp_name, slots=rp, bn=L["roster_positions"].count("BN"),
-        reserve=L["settings"].get("reserve_slots") or 0, scoring=S))
+        reserve=L["settings"].get("reserve_slots") or 0, scoring=S, lineup=lineup))
+
+
+# ------------------------------------------------------------------ lineup check (top-of-report banner)
+FLEX_OK = {"FLEX": ("RB", "WR", "TE"), "WRRB_FLEX": ("RB", "WR"), "REC_FLEX": ("WR", "TE"),
+           "SUPER_FLEX": ("QB", "RB", "WR", "TE"), "IDP_FLEX": ("DL", "LB", "DB")}
+NO_PLAY = ("Out", "IR", "Bye", "Suspended", "Sus", "PUP", "NA")
+
+
+def lineup_check(st, bn, labels, rp, starters):
+    """Is the current lineup the best legal one? Best lineup = Sleeper projection (the report's 'Sleeper proj' column).
+    A swap is flagged only on the report's own rule: the bench player is ahead on BOTH projection and prop-implied points
+    (projection alone when either has no prop line, e.g. QB/K/DEF), or the starter is Out/IR/on bye.
+    Starters whose game is already played stay put; empty slots count as not optimal.
+    Returns dict(ok, swaps=[text], issues=[text])."""
+    by_slot = {r["slot"]: r for r in st}
+    val = lambda r: 0.0 if r["status"] in NO_PLAY else r["pn"]  # noqa: E731
+    free = []          # (label, base slot type) still changeable
+    cur = []           # rows currently in the free slots
+    empty = []
+    for lab, typ, pid in zip(labels, rp, list(starters) + ["0"] * (len(rp) - len(starters))):
+        r = by_slot.get(lab) if pid and pid != "0" else None
+        if r is not None and r["status"] == "Played":
+            continue
+        free.append((lab, typ))
+        if r is None:
+            empty.append(lab)
+        else:
+            cur.append(r)
+    pool = [r for r in cur + [b for b in bn if b["status"] not in ("Played",)] if r["status"] not in NO_PLAY]
+    pool.sort(key=lambda r: -r["pn"])
+    used, best = set(), []
+    order = sorted(free, key=lambda f: (f[1] in FLEX_OK, len(FLEX_OK.get(f[1], ()))))
+    for lab, typ in order:
+        ok = FLEX_OK.get(typ, (typ,))
+        c = next((r for r in pool if id(r) not in used and r["pos"] in ok), None)
+        if c is not None:
+            used.add(id(c)); best.append(c)
+    cur_tot = sum(val(r) for r in cur)
+    best_tot = sum(r["pn"] for r in best)
+    ins = [r for r in best if all(r is not x for x in cur)]
+    outs = [r for r in cur if all(r is not x for x in best)]
+    ins.sort(key=lambda r: -r["pn"]); outs.sort(key=val)
+    swaps = []
+    if best_tot - cur_tot > 0.05:
+        for r in ins:
+            o = next((x for x in outs if x["pos"] == r["pos"]), outs[0] if outs else None)
+            if o is not None:
+                outs.remove(o)
+                if o["status"] not in NO_PLAY and not (r["pn"] > o["pn"] and (r["pp"] is None or o["pp"] is None or r["pp"] > o["pp"])):
+                    continue  # ahead on projection only: the report's advice keeps the starter
+                why = o["status"] if o["status"] in NO_PLAY else "%.1f" % o["pn"]
+                swaps.append("start %s (%.1f) over %s (%s)" % (r["name"], r["pn"], o["name"], why))
+            else:
+                swaps.append("start %s (%.1f) in an empty slot" % (r["name"], r["pn"]))
+    issues = []
+    for r in cur:
+        if r["status"] in NO_PLAY and not any(r is x for x in best) and not any(r["name"] in s_ for s_ in swaps):
+            issues.append("%s is %s with no bench replacement" % (r["name"], r["status"]))
+    n_empty_left = len(empty) - max(0, len(best) - len(cur))
+    if empty and n_empty_left > 0:
+        issues.append("%d empty starting slot%s" % (n_empty_left, "" if n_empty_left == 1 else "s"))
+    return dict(ok=not swaps and not issues, swaps=swaps, issues=issues)
 
 
 def build_defense(ctx, info, row, pts, S, me, rost, labels_unused):
