@@ -57,26 +57,39 @@ T.forEach(function(t,i){h.push('<tr><td>'+t.rank+'</td><td>'+(BEN[t.rid]||'\u201
 h.push('</tbody></table></div></section>');
 
 /* ---- odds over time */
-var COL=["#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2","#17becf","#bcbd22","#555555","#0b3d91","#f0a8c0"];
+var COL=["#1f77b4","#d62728","#2ca02c","#ff7f0e","#9467bd","#17becf","#8c564b","#e7298a","#222222","#a6a600","#7f7f7f","#00876c"],DASH=[0,0,0,0,0,0,"9 5","9 5","9 5","9 5","9 5","9 5"];
 window.powerOdds=function(b,k){var box=b.closest(".odds");box.setAttribute("data-k",k);[].forEach.call(box.querySelectorAll(".seg button"),function(x){x.setAttribute("aria-pressed",x===b)})};
-window.powerFocus=function(el,rid){var box=el.closest(".odds"),on=box.getAttribute("data-f")===String(rid);box.setAttribute("data-f",on?"":rid);
-[].forEach.call(box.querySelectorAll("[data-r]"),function(x){x.classList.toggle("dim",!on&&x.getAttribute("data-r")!==String(rid))})};
+function oddsDim(box){var f=box.getAttribute("data-f")||"";box.classList.toggle("foc",!!f);[].forEach.call(box.querySelectorAll("[data-r]"),function(x){var m=f&&x.getAttribute("data-r")!==f;x.classList.toggle("dim",!!m);x.classList.toggle("on",!!f&&!m)})}
+window.powerFocus=function(el,rid){var box=el.closest(".odds"),on=box.getAttribute("data-f")===String(rid);box.setAttribute("data-f",on?"":String(rid));oddsDim(box)};
 if(D.hist&&D.hist.length>1){
-var H=D.hist,W=560,Ht=280,ml=56,mr=20,mt=10,mb=26,n=H.length,cw=W-ml-mr,ch=Ht-mt-mb;
-function X(i){return ml+cw*i/(n-1)}function Y(v){return mt+ch*(1-v/100)}
+var H=D.hist,n=H.length;
 function xl(h){return h.live?"W"+h.week+"*":h.week===0?"Pre":"W"+h.week}
-var order=T.slice().sort(function(a,b){return b.playoff-a.playoff||b.bye-a.bye}),ci={};order.forEach(function(t,i){ci[t.rid]=COL[i%COL.length]});
-function svg(k){var g='<svg class="oc oc-'+k+'" viewBox="0 0 '+W+' '+Ht+'" role="img" aria-label="'+(k==="po"?"Playoff":"Bye")+' odds by week">';
-[0,25,50,75,100].forEach(function(v){g+='<line class="gl" x1="'+ml+'" x2="'+(W-mr)+'" y1="'+Y(v)+'" y2="'+Y(v)+'"/><text class="ax" x="'+(ml-5)+'" y="'+(Y(v)+4)+'" text-anchor="end">'+v+'%</text>'});
+var SH=[[/^chuba/i,"Chuba"],[/independent/i,"Indep. Variable"],[/^hoosier/i,"Hoosier"],[/omarion/i,"Omarion"],[/^jahsif/i,"Jahsif"],[/^ka13/i,"KA13"],[/^cooked/i,"Cooked"],[/^buck/i,"Buck Love"],[/^lil bro/i,"Lil bro"],[/^robbie/i,"Robbie"],[/^ceedees/i,"CeeDees"],[/^marshawn/i,"Marshawn"]];
+function short(nm){for(var i=0;i<SH.length;i++)if(SH[i][0].test(nm))return SH[i][1];nm=String(nm).split(/\s+/)[0];return nm.length>12?nm.slice(0,11)+"\u2026":nm}
+function r0(v){return v>0&&v<0.5?"<1%":Math.round(v)+"%"}
+var order=T.slice().sort(function(a,b){return b.playoff-a.playoff||b.bye-a.bye}),ci={},cd={};order.forEach(function(t,i){ci[t.rid]=COL[i%COL.length];cd[t.rid]=DASH[i%DASH.length]});
+function svg(k,mob){var W=mob?400:1000,Ht=mob?440:430,fs=mob?11:14,lw=mob?126:172,ml=mob?34:44,mr=lw,mt=14,mb=mob?24:30,cw=W-ml-mr,ch=Ht-mt-mb,gap=Math.round(fs*1.4);
+function X(i){return ml+cw*i/(n-1)}function Y(v){return mt+ch*(1-v/100)}
+var g='<svg class="oc oc-'+k+'" viewBox="0 0 '+W+' '+Ht+'" style="font-size:'+fs+'px" role="img" aria-label="'+(k==="po"?"Playoff":"Bye")+' odds by week">';
+[0,25,50,75,100].forEach(function(v){g+='<line class="gl" x1="'+ml+'" x2="'+(W-mr)+'" y1="'+Y(v)+'" y2="'+Y(v)+'"/><text class="ax" x="'+(ml-6)+'" y="'+(Y(v)+4)+'" text-anchor="end">'+v+'%</text>'});
 H.forEach(function(h,i){g+='<text class="ax" x="'+X(i)+'" y="'+(Ht-8)+'" text-anchor="middle">'+xl(h)+'</text>'});
-order.slice().reverse().forEach(function(t){var pts=H.map(function(h,i){return X(i).toFixed(1)+","+Y(h[k][t.rid]).toFixed(1)}).join(" ");
-g+='<g data-r="'+t.rid+'" style="color:'+ci[t.rid]+'"><polyline points="'+pts+'"><title>'+esc(t.name)+'</title></polyline>';
-H.forEach(function(h,i){g+='<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(h[k][t.rid]).toFixed(1)+'" r="2.6"><title>'+esc(t.name)+', '+xl(h)+': '+pc(h[k][t.rid])+'</title></circle>'});g+='</g>'});
+/* end labels with collision avoidance */
+var L=order.map(function(t){var y=Y(H[n-1][k][t.rid]);return{t:t,y0:y,y:y}}).sort(function(a,b){return a.y0-b.y0||b.t.playoff-a.t.playoff});
+var lo=mt+fs*0.4,hi=mt+ch;L.forEach(function(l,i){l.y=Math.max(l.y0,i?L[i-1].y+gap:lo)});
+for(var i=L.length-1;i>=0;i--){var mx=i===L.length-1?hi:L[i+1].y-gap;if(L[i].y>mx)L[i].y=mx}
+var ly={};L.forEach(function(l){ly[l.t.rid]=l});
+order.slice().reverse().forEach(function(t){var pts=H.map(function(h,i){return X(i).toFixed(1)+","+Y(h[k][t.rid]).toFixed(1)}).join(" "),l=ly[t.rid],xe=X(n-1),lx=xe+(mob?18:34);
+g+='<g data-r="'+t.rid+'" style="color:'+ci[t.rid]+'" onclick="powerFocus(this,'+t.rid+')"><polyline class="ln" points="'+pts+'"'+(cd[t.rid]?' stroke-dasharray="'+cd[t.rid]+'"':'')+'/><polyline class="hit" points="'+pts+'"><title>'+esc(t.name)+'</title></polyline>';
+H.forEach(function(h,i){g+='<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(h[k][t.rid]).toFixed(1)+'"><title>'+esc(t.name)+', '+xl(h)+': '+pc(h[k][t.rid])+'</title></circle>'});
+g+='<path class="ld" d="M'+(xe+5)+' '+l.y0.toFixed(1)+'L'+(lx-4)+' '+l.y.toFixed(1)+'"/><text class="lb" x="'+lx+'" y="'+(l.y+fs*0.36).toFixed(1)+'">'+esc(short(t.name))+' <tspan class="lv">'+r0(H[n-1][k][t.rid])+'</tspan><title>'+esc(t.name)+'</title></text></g>'});
 return g+'</svg>'}
-h.push('<section class="odds" data-k="po"><h2>Odds through the season</h2><p class="cap">Each point reruns the simulation with only what was known after that week (records, rosters, stats, projections and injuries at the time). Pre = preseason; W'+D.cur+'* = now, week '+D.cur+' still in progress.</p>');
+window.powerOddsBuild=function(mob){return svg("po",mob)+svg("bye",mob)};
+function isMob(){return (window.innerWidth||1000)<700}
+if(!window.__oddsRz){window.__oddsRz=1;window.addEventListener("resize",function(){var m=isMob();[].forEach.call(document.querySelectorAll(".odds .ocw"),function(w){if(w.getAttribute("data-m")!==String(m)&&window.powerOddsBuild){w.setAttribute("data-m",String(m));w.innerHTML=window.powerOddsBuild(m);oddsDim(w.closest(".odds"))}})})}
+h.push('<section class="odds" data-k="po"><h2>Odds through the season</h2><p class="cap">Each point reruns the simulation with only what was known after that week. Pre = preseason; W'+D.cur+'* = now (week '+D.cur+' in progress). Hover or tap a team to spotlight it.</p>');
 h.push('<div class="seg"><button type="button" aria-pressed="true" onclick="powerOdds(this,\'po\')">Playoff %</button><button type="button" aria-pressed="false" onclick="powerOdds(this,\'bye\')">Bye %</button></div>');
-h.push('<div class="ocw">'+svg("po")+svg("bye")+'</div><div class="ol">');
-order.forEach(function(t){h.push('<span data-r="'+t.rid+'" onclick="powerFocus(this,'+t.rid+')"><i style="background:'+ci[t.rid]+'"></i>'+esc(t.name)+'</span>')});
+h.push('<div class="ocw" data-m="'+isMob()+'">'+window.powerOddsBuild(isMob())+'</div><div class="ol">');
+order.forEach(function(t){h.push('<button type="button" data-r="'+t.rid+'" onclick="powerFocus(this,'+t.rid+')"><svg width="26" height="8"><line x1="1" y1="4" x2="25" y2="4" stroke="'+ci[t.rid]+'" stroke-width="4"'+(cd[t.rid]?' stroke-dasharray="7 3"':'')+'/></svg>'+esc(short(t.name))+' <b class="v-po">'+r0(t.playoff)+'</b><b class="v-bye">'+r0(t.bye)+'</b></button>')});
 h.push('</div></section>')}
 
 /* ---- projected finish */
