@@ -63,7 +63,7 @@ function oddsDim(box){var f=box.getAttribute("data-f")||"";box.classList.toggle(
 window.powerFocus=function(el,rid){var box=el.closest(".odds"),on=box.getAttribute("data-f")===String(rid);box.setAttribute("data-f",on?"":String(rid));oddsDim(box)};
 if(D.hist&&D.hist.length>1){
 var H=D.hist,n=H.length;
-function xl(h){return h.live?"W"+h.week+"*":h.week===0?"Pre":"W"+h.week}
+function xl(h){return h.live?"W"+h.week+"*":h.week<0?"Pre-draft":h.week===0?"Pre":"W"+h.week}
 var SH=[[/^chuba/i,"Chuba"],[/independent/i,"Indep. Variable"],[/^hoosier/i,"Hoosier"],[/omarion/i,"Omarion"],[/^jahsif/i,"Jahsif"],[/^ka13/i,"KA13"],[/^cooked/i,"Cooked"],[/^buck/i,"Buck Love"],[/^lil bro/i,"Lil bro"],[/^robbie/i,"Robbie"],[/^ceedees/i,"CeeDees"],[/^marshawn/i,"Marshawn"]];
 function short(nm){for(var i=0;i<SH.length;i++)if(SH[i][0].test(nm))return SH[i][1];nm=String(nm).split(/\s+/)[0];return nm.length>12?nm.slice(0,11)+"\u2026":nm}
 function r0(v){return v>0&&v<0.5?"<1%":Math.round(v)+"%"}
@@ -72,7 +72,7 @@ function svg(k,mob){var W=mob?400:1000,Ht=mob?440:430,fs=mob?11:14,lw=mob?126:17
 function X(i){return ml+cw*i/(n-1)}function Y(v){return mt+ch*(1-v/100)}
 var g='<svg class="oc oc-'+k+'" viewBox="0 0 '+W+' '+Ht+'" style="font-size:'+fs+'px" role="img" aria-label="'+(k==="po"?"Playoff":"Bye")+' odds by week">';
 [0,25,50,75,100].forEach(function(v){g+='<line class="gl" x1="'+ml+'" x2="'+(W-mr)+'" y1="'+Y(v)+'" y2="'+Y(v)+'"/><text class="ax" x="'+(ml-6)+'" y="'+(Y(v)+4)+'" text-anchor="end">'+v+'%</text>'});
-H.forEach(function(h,i){g+='<text class="ax" x="'+X(i)+'" y="'+(Ht-8)+'" text-anchor="middle">'+xl(h)+'</text>'});
+H.forEach(function(h,i){var l=xl(h);g+='<text class="ax" x="'+X(i)+'" y="'+(Ht-8)+'" text-anchor="middle">'+(mob&&l.indexOf("-")>0?'<tspan x="'+X(i)+'" dy="-0.55em">'+l.split("-")[0]+'-</tspan><tspan x="'+X(i)+'" dy="1.1em">'+l.split("-")[1]+'</tspan>':l)+'</text>'});
 /* end labels with collision avoidance */
 var L=order.map(function(t){var y=Y(H[n-1][k][t.rid]);return{t:t,y0:y,y:y}}).sort(function(a,b){return a.y0-b.y0||b.t.playoff-a.t.playoff});
 var lo=mt+fs*0.4,hi=mt+ch;L.forEach(function(l,i){l.y=Math.max(l.y0,i?L[i-1].y+gap:lo)});
@@ -86,7 +86,7 @@ return g+'</svg>'}
 window.powerOddsBuild=function(mob){return svg("po",mob)+svg("bye",mob)};
 function isMob(){return (window.innerWidth||1000)<700}
 if(!window.__oddsRz){window.__oddsRz=1;window.addEventListener("resize",function(){var m=isMob();[].forEach.call(document.querySelectorAll(".odds .ocw"),function(w){if(w.getAttribute("data-m")!==String(m)&&window.powerOddsBuild){w.setAttribute("data-m",String(m));w.innerHTML=window.powerOddsBuild(m);oddsDim(w.closest(".odds"))}})})}
-h.push('<section class="odds" data-k="po"><h2>Odds through the season</h2><p class="cap">Each point reruns the simulation with only what was known after that week. Pre = preseason; W'+D.cur+'* = now (week '+D.cur+' in progress). Hover or tap a team to spotlight it.</p>');
+h.push('<section class="odds" data-k="po"><h2>Odds through the season</h2><p class="cap">Each point reruns the simulation with only what was known after that week. Pre-draft = keepers only; Pre = after the draft; W'+D.cur+'* = now (week '+D.cur+' in progress). Hover or tap a team to spotlight it.</p>');
 h.push('<div class="seg"><button type="button" aria-pressed="true" onclick="powerOdds(this,\'po\')">Playoff %</button><button type="button" aria-pressed="false" onclick="powerOdds(this,\'bye\')">Bye %</button></div>');
 h.push('<div class="ocw" data-m="'+isMob()+'">'+window.powerOddsBuild(isMob())+'</div><div class="ol">');
 order.forEach(function(t){h.push('<button type="button" data-r="'+t.rid+'" onclick="powerFocus(this,'+t.rid+')"><svg width="26" height="8"><line x1="1" y1="4" x2="25" y2="4" stroke="'+ci[t.rid]+'" stroke-width="4"'+(cd[t.rid]?' stroke-dasharray="7 3"':'')+'/></svg>'+esc(short(t.name))+' <b class="v-po">'+r0(t.playoff)+'</b><b class="v-bye">'+r0(t.bye)+'</b></button>')});
@@ -109,9 +109,9 @@ h.push('</tbody></table></div></section>');
 
 /* ---- methodology */
 h.push('<section><h2>Methodology</h2><ul class="meth">'+
-'<li><b>Strength:</b> each player = his points per game this season, weighted by games played (gp \u00f7 (gp + '+D.g0+'), so 50% at '+D.g0+' games), plus his Sleeper projection that week for the rest; a team = its best lineup from the current roster, so points from players now hurt, traded or dropped don\u2019t count. Byes, this week\u2019s Out/IR tags and long-term injuries count as zero.</li>'+
+'<li><b>Strength:</b> each player = his points per game this season, weighted by games played (gp \u00f7 (gp + '+D.g0+'), so 50% at '+D.g0+' games), plus his Sleeper projection that week for the rest; each team\u2019s edge over the league average is then scaled by '+D.beta_now+' (how much past seasons say these edges hold up); a team = its best lineup from the current roster, so points from players now hurt, traded or dropped don\u2019t count. Byes, this week\u2019s Out/IR tags and long-term injuries count as zero.</li>'+
 '<li><b>Simulation:</b> '+D.sims.toLocaleString("en-US")+' runs of weeks '+D.cur+'\u2013'+D.reg_end+' on the real schedule; each score varies by \u00b1'+f1(D.sd)+' pts (the real week-to-week spread). Week '+D.cur+' keeps points already scored.</li>'+
-'<li><b>Odds through the season:</b> the same model rerun after each week using records, rosters, player points per game and that week\u2019s Sleeper projections as they were then; preseason uses projections only. Each simulated season also gives every team a hidden strength boost or drag (typical size '+D.tau0+' pts/wk preseason, shrinking as games are played; '+D.tau_now+' now).</li>'+
+'<li><b>Odds through the season:</b> Pre-draft starts everyone level except for keepers (a keeper counts for how much better he is than what that pick usually gets). Pre adds the whole drafted roster (Sleeper preseason projections). In Best League 2022\u201325, draft value explained only about half of the real gaps between teams, so the start trusts it about half ('+D.beta0+'), and trust in the roster model grows each week ('+D.beta_now+' now). Each later point reruns the model with only what was known after that week. Every simulated season also gives each team a hidden boost or drag (typical size '+D.tau_pre+' pts/wk pre-draft, '+D.tau0+' after the draft, '+D.tau_now+' now).</li>'+
 '<li><b>Standings:</b> wins, then points for. Top '+D.nplay+' make it; seeds 1\u20132 get a bye; Sleeper\u2019s fixed bracket (no reseeding); title odds simulate weeks '+D.pstart+'\u2013'+D.end+'.</li>'+
 '<li><b>Caveat:</b> projections and injury timelines are estimates, and future trades and waiver moves aren\u2019t modeled. Data: Sleeper.</li></ul></section>');
 return h.join("");

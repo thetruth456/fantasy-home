@@ -17,6 +17,7 @@ import json, os, sys, math, random, datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sources as S
 import podcast as PC
+import draftprior as DP
 
 LEAGUE = PC.LEAGUE
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -24,11 +25,26 @@ OUT = os.path.join(os.environ.get("FH_OUT_DIR") or ROOT, "best-power-data.js")
 CACHE = os.environ.get("FH_CACHE_DIR") or os.path.join(ROOT, ".cache")
 G0 = 7.0                  # player level: weight on his 2026 points per game = gp / (gp + G0), rest = Sleeper projection
                           # (1 game 13%, 4 games 36%, 7 games 50%, 13 games 65%: more projection early, more real points later)
-# Team-strength uncertainty: every simulated season draws one persistent offset per team ~ N(0, tau_k), where
-# tau_k = 1 / sqrt(1/TAU0^2 + k/sd^2) after k completed weeks (normal-normal shrinkage: prior spread TAU0, weekly noise sd).
-# TAU0 calibrated on this season: the preseason model's error vs actual PPG over weeks 1-7 across the 12 teams has
-# sd 11.0; removing the noise of a 7-week average (22.9/sqrt 7 = 8.7) leaves sqrt(11.0^2 - 8.7^2) = 6.8 pts/week.
-TAU0 = float(os.environ.get("FH_POWER_TAU0", "6.8"))
+# Bayesian team strength, calibrated on Best League 2022-2025 (48 team-seasons; reproduce with tools/power_calibrate.py):
+# * Prior = the draft. Post-draft value (tools/draftprior.py) predicts real season PPG with slope BETA0 = 0.49 (se 0.24):
+#   a team drafted 10 pts/wk above average is expected to be ~5 above. What it misses (trades, waivers, injuries, luck in
+#   who breaks out) has sd TAU0 = 5.1 pts/wk after removing week-to-week noise.
+# * Pre-draft = keeper surplus only, same slope (post-draft value tracks keeper surplus 1:1, slope 1.04), plus the spread of
+#   how drafts deviate from ADP (SIG_DRAFT = 4.75 pts/wk of draft value) as extra uncertainty.
+# * In season, the roster model's edge over average is trusted more each week: beta_t = 1 - (1 - BETA0) * C / (C + t),
+#   C = 8.3 fitted to how well the week-t model predicted rest-of-season PPG in 2022-2025 (0.49 -> 0.73 after week 7).
+# * Every simulated season draws one persistent offset per team ~ N(0, tau_t), tau_t = 1/sqrt(1/TAU0^2 + t/sd^2)
+#   (normal-normal update with weekly noise sd).
+BETA0, BETA_C, SIG_DRAFT = 0.49, 8.3, 4.75
+TAU0 = float(os.environ.get("FH_POWER_TAU0", "5.1"))
+
+
+def beta_t(t):
+    return 1.0 - (1.0 - BETA0) * BETA_C / (BETA_C + max(0, t))
+
+
+def tau_pre():
+    return math.sqrt(TAU0 ** 2 + (BETA0 * SIG_DRAFT) ** 2)
 
 
 def blend_w(gp):
@@ -63,7 +79,7 @@ def phi(x):
     return 0.5 * (1 + math.erf(x / math.sqrt(2)))
 
 
-def history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT, P, sd, sims):
+def history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT, P, sd, sims, prior):
     """Playoff / bye odds as they looked after each completed week t = 0 (preseason) .. last, using only what was known then:
     records and points for through week t, each team's roster going into week t+1 (Sleeper matchup data), player points per
     game through week t (blended with projection by games played), team-strength uncertainty tau_k(t), and Sleeper's week t+1 projection as each
@@ -75,7 +91,14 @@ def history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT
     pj = {w: {e["player_id"]: e for e in S.sleeper_projections(season, w, "regular") if e.get("player_id")} for w in range(1, last + 2)}
     stats = {w: S.sleeper_stats(season, w, "regular") for w in range(1, last + 1)}
     out = []
-    for t in range(0, last + 1):
+    post_dev, pre_dev = prior
+    for t in range(-1, last + 1):
+        if t <= 0:  # -1 = before the draft (keepers only), 0 = after the draft: no games yet, prior only
+            dev = pre_dev if t < 0 else post_dev
+            out.append(dict(week=t, **sim_odds({w: {r: 100.0 + BETA0 * dev[r] for r in rids} for w in range(1, reg_end + 1)},
+                                               {r: [0.0, 0.0] for r in rids}, rids, pairs, nplay, sd, tau_pre() if t < 0 else TAU0, sims, 1000 + t)))
+            S.log("history %s done" % ("pre-draft" if t < 0 else "post-draft"))
+            continue
         nxt = t + 1
         pg = {}
         for w in range(1, t + 1):
@@ -137,27 +160,36 @@ def history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT
             for w in weeks:
                 for r in rids:
                     mu[w][r] *= k
-        rng = random.Random(1000 + t)
-        tk = tau_k(t, sd)
-        po, bye = {r: 0 for r in rids}, {r: 0 for r in rids}
-        PR = {w: pairs(w) for w in weeks}
-        for _ in range(sims):
-            W = {r: rec[r][0] for r in rids}; F = {r: rec[r][1] for r in rids}
-            off = {r: rng.gauss(0, tk) if tk else 0.0 for r in rids}
-            for w in weeks:
-                for a, b in PR[w]:
-                    x, y = rng.gauss(mu[w][a] + off[a], sd), rng.gauss(mu[w][b] + off[b], sd)
-                    F[a] += x; F[b] += y
-                    if x > y: W[a] += 1
-                    elif y > x: W[b] += 1
-                    else: W[a] += .5; W[b] += .5
-            order = sorted(rids, key=lambda r: (-W[r], -F[r]))
-            for i, r in enumerate(order[:nplay]):
-                po[r] += 1
-                if i < 2: bye[r] += 1
-        out.append(dict(week=t, po={r: round(po[r] / sims * 100, 1) for r in rids}, bye={r: round(bye[r] / sims * 100, 1) for r in rids}))
+        b = beta_t(t)
+        for w in weeks:  # shrink each team's edge over the league toward the prior's trust level
+            lw = sum(mu[w].values()) / len(rids)
+            for r in rids:
+                mu[w][r] = lw + b * (mu[w][r] - lw)
+        out.append(dict(week=t, **sim_odds(mu, rec, rids, pairs, nplay, sd, tau_k(t, sd), sims, 1000 + t)))
         S.log("history after week %d done" % t)
     return out
+
+
+def sim_odds(mu, rec, rids, pairs, nplay, sd, tk, sims, seed):
+    rng = random.Random(seed)
+    weeks = sorted(mu)
+    po, bye = {r: 0 for r in rids}, {r: 0 for r in rids}
+    PR = {w: pairs(w) for w in weeks}
+    for _ in range(sims):
+        W = {r: rec[r][0] for r in rids}; F = {r: rec[r][1] for r in rids}
+        off = {r: rng.gauss(0, tk) if tk else 0.0 for r in rids}
+        for w in weeks:
+            for a, b in PR[w]:
+                x, y = rng.gauss(mu[w][a] + off[a], sd), rng.gauss(mu[w][b] + off[b], sd)
+                F[a] += x; F[b] += y
+                if x > y: W[a] += 1
+                elif y > x: W[b] += 1
+                else: W[a] += .5; W[b] += .5
+        order = sorted(rids, key=lambda r: (-W[r], -F[r]))
+        for i, r in enumerate(order[:nplay]):
+            po[r] += 1
+            if i < 2: bye[r] += 1
+    return dict(po={r: round(po[r] / sims * 100, 1) for r in rids}, bye={r: round(bye[r] / sims * 100, 1) for r in rids})
 
 
 def main():
@@ -281,10 +313,19 @@ def main():
     for w in range(cur, end + 1):
         for r in rids:
             mu[w][r] = k * raw[w][r]
+    # Bayesian shrink of each team's edge (see BETA0 / beta_t): future weeks toward that week's league mean
+    B = beta_t(last)
+    raw_str = {r: sum(mu[w][r] for w in fut) / len(fut) for r in rids}
+    for w in range(cur + 1, end + 1):
+        lw = sum(mu[w].values()) / len(rids)
+        for r in rids:
+            mu[w][r] = lw + B * (mu[w][r] - lw)
+    lg_f = sum(raw_str.values()) / len(rids)
     frac = {}
-    for r in rids:  # in-progress week: real points already banked, less noise left
-        mu[cur][r] = locked[r] + k * rem[r]
-        frac[r] = k * rem[r] / mu[cur][r] if mu[cur][r] else 1.0
+    for r in rids:  # in-progress week: real points already banked, less noise left; the rest shrunk like the team's future weeks
+        rs = k * rem[r] * ((lg_f + B * (raw_str[r] - lg_f)) / raw_str[r] if raw_str[r] else 1.0)
+        mu[cur][r] = locked[r] + rs
+        frac[r] = rs / mu[cur][r] if mu[cur][r] else 1.0
     strength = {r: sum(mu[w][r] for w in fut) / len(fut) for r in rids}
     ap = {r: 100 * sum(phi((mu[w][r] - mu[w][o]) / (sd * math.sqrt(2))) for w in fut for o in rids if o != r) / (len(fut) * (len(rids) - 1)) for r in rids}
 
@@ -366,12 +407,19 @@ def main():
         x["sos_rank"] = i + 1
     for i, x in enumerate(sorted(rows, key=lambda x: -x["strength"])):
         x["str_rank"] = i + 1
-    hist = [] if os.environ.get("FH_POWER_NO_HISTORY") else history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT, P, sd, sims)
+    # draft-value prior (keepers, post-draft value)
+    drafts = get("/v1/league/%s/drafts" % LEAGUE)
+    picks = get("/v1/draft/%s/picks" % drafts[0]["draft_id"])
+    post_dev, pre_dev, keep = DP.values(DP.season_projections(season), picks, slots, fpts, lineup)
+    for x in rows:
+        x["keepers"] = keep.get(x["rid"], [])
+        x["draft_dev"], x["keeper_dev"] = round(post_dev[x["rid"]], 1), round(pre_dev[x["rid"]], 1)
+    hist = [] if os.environ.get("FH_POWER_NO_HISTORY") else history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT, P, sd, sims, (post_dev, pre_dev))
     by_r = {x["rid"]: x for x in rows}
     hist.append(dict(week=cur, live=True, po={r: by_r[r]["playoff"] for r in rids}, bye={r: by_r[r]["bye"] for r in rids}))
     now = datetime.datetime.now(datetime.timezone.utc)
     data = dict(hist=hist, season=season, asof=now.strftime("%Y-%m-%dT%H:%M:%SZ"), last=last, cur=cur, reg_end=reg_end, pstart=pstart, end=end,
-                sims=sims, sd=round(sd, 1), k=round(k, 3), g0=G0, w_now=round(blend_w(last), 2), tau0=TAU0, tau_now=round(TK, 1), pw=PW, nplay=nplay,
+                sims=sims, sd=round(sd, 1), k=round(k, 3), g0=G0, w_now=round(blend_w(last), 2), tau0=TAU0, tau_now=round(TK, 1), tau_pre=round(tau_pre(), 1), beta0=BETA0, beta_now=round(B, 2), draft_type=drafts[0].get("type"), pw=PW, nplay=nplay,
                 locked_games=sorted({tm for (w, tm) in done | live if w == cur}),
                 teams=rows)
     with open(OUT, "w") as f:
