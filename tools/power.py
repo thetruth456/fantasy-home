@@ -3,8 +3,8 @@
 Not run by the update workflow. Writes best-power-data.js (window.POWER.best). Stdlib only.
 Usage: python tools/power.py [sims]   (default 10000)
 Model (also summarized on the page):
-  each rostered player's weekly value = 50% his Sleeper projection for that week + 50% his own 2026 points per game
-  played (projection only if he has played fewer than MIN_GP games). Team weekly mean = best legal lineup from the
+  each rostered player's weekly value = his own 2026 points per game (weight gp/(gp+G0)) + his Sleeper projection
+  for that week (the rest). Each simulated season adds a persistent team-strength offset (see TAU0 / tau_k). Team weekly mean = best legal lineup from the
   CURRENT roster on those values, scaled so the league average matches real scoring. So production by players who
   are now hurt, traded or dropped no longer counts for anyone. A player counts as zero in a week when he has no
   projection (bye, or Sleeper has him out), when LONG_TERM in tools/podcast.py has him out, or (this week only)
@@ -22,9 +22,21 @@ LEAGUE = PC.LEAGUE
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(os.environ.get("FH_OUT_DIR") or ROOT, "best-power-data.js")
 CACHE = os.environ.get("FH_CACHE_DIR") or os.path.join(ROOT, ".cache")
-W_SEASON = 0.5            # player level: weight on his 2026 points per game (rest = Sleeper projection)
-TAU = float(os.environ.get("FH_POWER_TAU", "0"))  # optional per-sim team-strength uncertainty (pts/wk); 0 = off
-MIN_GP = 2                # fewer games played than this -> projection only
+G0 = 7.0                  # player level: weight on his 2026 points per game = gp / (gp + G0), rest = Sleeper projection
+                          # (1 game 13%, 4 games 36%, 7 games 50%, 13 games 65%: more projection early, more real points later)
+# Team-strength uncertainty: every simulated season draws one persistent offset per team ~ N(0, tau_k), where
+# tau_k = 1 / sqrt(1/TAU0^2 + k/sd^2) after k completed weeks (normal-normal shrinkage: prior spread TAU0, weekly noise sd).
+# TAU0 calibrated on this season: the preseason model's error vs actual PPG over weeks 1-7 across the 12 teams has
+# sd 11.0; removing the noise of a 7-week average (22.9/sqrt 7 = 8.7) leaves sqrt(11.0^2 - 8.7^2) = 6.8 pts/week.
+TAU0 = float(os.environ.get("FH_POWER_TAU0", "6.8"))
+
+
+def blend_w(gp):
+    return gp / (gp + G0) if gp and gp > 0 else 0.0
+
+
+def tau_k(k, sd):
+    return 1.0 / math.sqrt(1.0 / TAU0 ** 2 + k / sd ** 2) if TAU0 > 0 else 0.0
 # Power score weights (0-100 scale each)
 PW = dict(strength=0.40, playoff=0.30, first=0.15, title=0.15)
 FLEX = {"FLEX": {"RB", "WR", "TE"}, "SUPER_FLEX": {"QB", "RB", "WR", "TE"}, "REC_FLEX": {"WR", "TE"}, "WRRB_FLEX": {"RB", "WR"}}
@@ -54,7 +66,7 @@ def phi(x):
 def history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT, P, sd, sims):
     """Playoff / bye odds as they looked after each completed week t = 0 (preseason) .. last, using only what was known then:
     records and points for through week t, each team's roster going into week t+1 (Sleeper matchup data), player points per
-    game through week t (50/50 with projection, projection only under MIN_GP games), and Sleeper's week t+1 projection as each
+    game through week t (blended with projection by games played), team-strength uncertainty tau_k(t), and Sleeper's week t+1 projection as each
     player's weekly rate for the rest of the season (zero on NFL byes). A player with no week t+1 projection is treated as
     back the next week unless LONG_TERM says the injury runs longer. Same scoring spread, tiebreaks and seeding as the main model."""
     games = {}
@@ -106,7 +118,7 @@ def history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT
                 if out_now:
                     pr, tm = last_rate(pid)
                 g = pg.get(pid)
-                wt = W_SEASON * min(1.0, g[0] / 4.0) if g and g[0] >= MIN_GP and pr else 0.0  # small samples count less
+                wt = blend_w(g[0]) if g and pr else 0.0
                 v = wt * g[1] / g[0] + (1 - wt) * pr if wt else pr
                 lt = LT.get(pid)
                 vals[pid] = (v, tm, out_now, lt)
@@ -126,11 +138,12 @@ def history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT
                 for r in rids:
                     mu[w][r] *= k
         rng = random.Random(1000 + t)
+        tk = tau_k(t, sd)
         po, bye = {r: 0 for r in rids}, {r: 0 for r in rids}
         PR = {w: pairs(w) for w in weeks}
         for _ in range(sims):
             W = {r: rec[r][0] for r in rids}; F = {r: rec[r][1] for r in rids}
-            off = {r: rng.gauss(0, TAU) if TAU else 0.0 for r in rids}
+            off = {r: rng.gauss(0, tk) if tk else 0.0 for r in rids}
             for w in weeks:
                 for a, b in PR[w]:
                     x, y = rng.gauss(mu[w][a] + off[a], sd), rng.gauss(mu[w][b] + off[b], sd)
@@ -233,7 +246,8 @@ def main():
         if b <= 0:          # no projection (bye / Sleeper has him out), LONG_TERM out, or ruled out this week
             return 0.0
         g = pg.get(pid)
-        return W_SEASON * max(0.0, g[1] / g[0]) + (1 - W_SEASON) * b if g and g[0] >= MIN_GP else b
+        wt = blend_w(g[0]) if g else 0.0
+        return wt * max(0.0, g[1] / g[0]) + (1 - wt) * b if wt else b
 
     def pos(pid):
         return (P.get(pid) or {}).get("position") or ""
@@ -282,6 +296,7 @@ def main():
 
     # ---------------- Monte Carlo
     PR = {w: pairs(w) for w in range(cur, reg_end + 1)}
+    TK = tau_k(last, sd)
 
     def simulate(rng, pairfn, n, playoffs):
         seedc = {r: [0] * nplay for r in rids}
@@ -290,7 +305,7 @@ def main():
         for _ in range(n):
             W = {r: rec[r]["w"] + 0.5 * rec[r]["t"] for r in rids}
             F = {r: rec[r]["pf"] for r in rids}
-            off = {r: rng.gauss(0, TAU) if TAU else 0.0 for r in rids}
+            off = {r: rng.gauss(0, TK) if TK else 0.0 for r in rids}
             for w in range(cur, reg_end + 1):
                 sc = {r: rng.gauss(mu[w][r] + (off[r] if w > cur else frac[r] * off[r]), sd * (math.sqrt(frac[r]) if w == cur else 1)) for r in rids}
                 for a, b in pairfn(w):
@@ -356,13 +371,13 @@ def main():
     hist.append(dict(week=cur, live=True, po={r: by_r[r]["playoff"] for r in rids}, bye={r: by_r[r]["bye"] for r in rids}))
     now = datetime.datetime.now(datetime.timezone.utc)
     data = dict(hist=hist, season=season, asof=now.strftime("%Y-%m-%dT%H:%M:%SZ"), last=last, cur=cur, reg_end=reg_end, pstart=pstart, end=end,
-                sims=sims, sd=round(sd, 1), k=round(k, 3), w_season=W_SEASON, pw=PW, nplay=nplay,
+                sims=sims, sd=round(sd, 1), k=round(k, 3), g0=G0, w_now=round(blend_w(last), 2), tau0=TAU0, tau_now=round(TK, 1), pw=PW, nplay=nplay,
                 locked_games=sorted({tm for (w, tm) in done | live if w == cur}),
                 teams=rows)
     with open(OUT, "w") as f:
         f.write("/* Static snapshot generated by tools/power.py. The update workflow does not touch this file. */\n")
         f.write("window.POWER=window.POWER||{};\nwindow.POWER.best=" + json.dumps(data, separators=(",", ":"), ensure_ascii=False) + ";\n")
-    S.log("wrote %s (weeks %d-%d left, %d sims, sd %.1f, k %.3f)" % (OUT, cur, reg_end, sims, sd, k))
+    S.log("wrote %s (weeks %d-%d left, %d sims, sd %.1f, k %.3f, tau %.1f)" % (OUT, cur, reg_end, sims, sd, k, TK))
 
 
 if __name__ == "__main__":

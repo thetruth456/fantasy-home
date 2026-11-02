@@ -109,9 +109,9 @@ h.push('</tbody></table></div></section>');
 
 /* ---- methodology */
 h.push('<section><h2>Methodology</h2><ul class="meth">'+
-'<li><b>Strength:</b> each player = '+Math.round(D.w_season*100)+'% his points per game this season + '+Math.round((1-D.w_season)*100)+'% his Sleeper projection that week; a team = its best lineup from the current roster, so points from players now hurt, traded or dropped don\u2019t count. Byes, this week\u2019s Out/IR tags and long-term injuries count as zero.</li>'+
+'<li><b>Strength:</b> each player = his points per game this season, weighted by games played (gp \u00f7 (gp + '+D.g0+'), so 50% at '+D.g0+' games), plus his Sleeper projection that week for the rest; a team = its best lineup from the current roster, so points from players now hurt, traded or dropped don\u2019t count. Byes, this week\u2019s Out/IR tags and long-term injuries count as zero.</li>'+
 '<li><b>Simulation:</b> '+D.sims.toLocaleString("en-US")+' runs of weeks '+D.cur+'\u2013'+D.reg_end+' on the real schedule; each score varies by \u00b1'+f1(D.sd)+' pts (the real week-to-week spread). Week '+D.cur+' keeps points already scored.</li>'+
-'<li><b>Odds through the season:</b> the same model rerun after each week using records, rosters, player points per game and that week\u2019s Sleeper projections as they were then (per-player points per game phased in over the first 4 games); preseason uses projections only.</li>'+
+'<li><b>Odds through the season:</b> the same model rerun after each week using records, rosters, player points per game and that week\u2019s Sleeper projections as they were then; preseason uses projections only. Each simulated season also gives every team a hidden strength boost or drag (typical size '+D.tau0+' pts/wk preseason, shrinking as games are played; '+D.tau_now+' now).</li>'+
 '<li><b>Standings:</b> wins, then points for. Top '+D.nplay+' make it; seeds 1\u20132 get a bye; Sleeper\u2019s fixed bracket (no reseeding); title odds simulate weeks '+D.pstart+'\u2013'+D.end+'.</li>'+
 '<li><b>Caveat:</b> projections and injury timelines are estimates, and future trades and waiver moves aren\u2019t modeled. Data: Sleeper.</li></ul></section>');
 return h.join("");
