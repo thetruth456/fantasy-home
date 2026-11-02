@@ -123,3 +123,5 @@ tr.me td{background:var(--acc-soft)}
 td.nt{white-space:nowrap;color:var(--mut);font-size:13px}
 td.tw{white-space:normal;min-width:190px;max-width:360px}.inj{color:var(--mut);font-size:12px}
 .lineup{font-weight:700;padding:8px 12px;border-radius:10px;margin:-6px 0 16px;font-size:15px}.lineup.success:before{content:"\2713  "}.lineup.danger:before{content:"\26A0  "}
+.odds .seg{margin:2px 0 8px}.ocw{max-width:760px}.oc{width:100%;height:auto;display:block}.odds[data-k=po] .oc-bye,.odds[data-k=bye] .oc-po{display:none}.oc .gl{stroke:var(--line);stroke-width:1}.oc .ax{font-size:11px;fill:var(--mut)}.oc polyline{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linejoin:round}.oc circle{fill:currentColor}.oc g.dim{opacity:.12}.ol{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;margin:6px 0 0;max-width:760px}.ol span{cursor:pointer;white-space:nowrap}.ol span.dim{opacity:.4}.ol i{display:inline-block;width:14px;height:4px;border-radius:2px;margin-right:5px;vertical-align:3px}
+@media(max-width:600px){.oc .ax{font-size:17px}.oc polyline{stroke-width:3}.oc circle{r:3.4}}

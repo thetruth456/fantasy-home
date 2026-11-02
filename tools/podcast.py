@@ -273,6 +273,44 @@ def main():
                 if not t["hiloss"] or ms > t["hiloss"]["pts"]: t["hiloss"] = dict(pts=ms, week=g["week"], opp=op, opp_pts=os_)
             else:
                 t["t"] += 1
+    # ---------------- bye week merchant: points each opponent lost to NFL byes in the week they met this team
+    from power import lineup
+    slots = [x for x in L["roster_positions"] if x not in ("BN", "IR", "TAXI")]
+    ppg_ = {}
+    for w in weeks:
+        for pid, e in stats[w].items():
+            st = e.get("stats") or {}
+            if st.get("gp"):
+                x = ppg_.setdefault(pid, [0, 0.0]); x[0] += 1; x[1] += fpts(st)
+    teams_wk = {w: {g["home"] for g in sched if g["week"] == w} | {g["away"] for g in sched if g["week"] == w} for w in weeks}
+
+    def nfl_team(pid, w):
+        e = stats[w].get(pid) or {}
+        if e.get("team"):
+            return e["team"]
+        for k in sorted(weeks, key=lambda k: abs(k - w)):
+            e = stats[k].get(pid) or {}
+            if e.get("team"):
+                return e["team"]
+        return (P.get(pid) or {}).get("team")
+    byeloss = {}
+    for w in weeks:
+        for m in M[w]:
+            cands, live = [], []
+            for pid in m.get("players") or []:
+                g = ppg_.get(pid)
+                v = (g[1] / g[0]) if g else 0.0
+                c = (v, (P.get(pid) or {}).get("position") or "", pid)
+                cands.append(c)
+                if nfl_team(pid, w) in teams_wk[w]:
+                    live.append(c)
+            byeloss[(w, m["roster_id"])] = lineup(slots, cands)[0] - lineup(slots, live)[0]
+    for g in games:
+        for me, op, ms, os_ in ((g["a"], g["b"], g["pa"], g["pb"]), (g["b"], g["a"], g["pb"], g["pa"])):
+            bl = byeloss.get((g["week"], op), 0.0)
+            T[me]["bye_gain"] = T[me].get("bye_gain", 0.0) + bl
+            if ms > os_ and ms - os_ < bl:
+                T[me]["bye_wins"] = T[me].get("bye_wins", 0) + 1
     rows = []
     for rid, t in T.items():
         x = dict(team[rid])
@@ -281,7 +319,8 @@ def main():
                       dip=round(t["dip"] / len(weeks), 1), top=t["top"], bottom=t["bottom"], hiloss=t["hiloss"], lowin=t["lowin"],
                       inj_games=inj[rid]["games"], inj_bill=round(inj[rid]["bill"], 1), inj_early=inj[rid]["early"], inj_worst=inj[rid]["worst"],
                       inj_games_so=inj[rid]["games_so"], inj_bill_so=round(inj[rid]["bill_so"], 1),
-                      inj_games_co=inj[rid]["games_co"], inj_bill_co=round(inj[rid]["bill_co"], 1)))
+                      inj_games_co=inj[rid]["games_co"], inj_bill_co=round(inj[rid]["bill_co"], 1),
+                      bye_gain=round(t.get("bye_gain", 0.0), 1), bye_wins=t.get("bye_wins", 0)))
         rows.append(x)
 
     def z(vals):

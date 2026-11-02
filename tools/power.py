@@ -51,6 +51,102 @@ def phi(x):
     return 0.5 * (1 + math.erf(x / math.sqrt(2)))
 
 
+def history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT, P, sd, sims):
+    """Playoff / bye odds as they looked after each completed week t = 0 (preseason) .. last, using only what was known then:
+    records and points for through week t, each team's roster going into week t+1 (Sleeper matchup data), player points per
+    game through week t (50/50 with projection, projection only under MIN_GP games), and Sleeper's week t+1 projection as each
+    player's weekly rate for the rest of the season (zero on NFL byes). A player with no week t+1 projection is treated as
+    back the next week unless LONG_TERM says the injury runs longer. Same scoring spread, tiebreaks and seeding as the main model."""
+    games = {}
+    for g in sched:
+        games.setdefault(g["week"], set()).update((g["home"], g["away"]))
+    pj = {w: {e["player_id"]: e for e in S.sleeper_projections(season, w, "regular") if e.get("player_id")} for w in range(1, last + 2)}
+    stats = {w: S.sleeper_stats(season, w, "regular") for w in range(1, last + 1)}
+    out = []
+    for t in range(0, last + 1):
+        nxt = t + 1
+        pg = {}
+        for w in range(1, t + 1):
+            for e in stats[w]:
+                st_ = e.get("stats") or {}
+                if e.get("player_id") and st_.get("gp"):
+                    x = pg.setdefault(e["player_id"], [0, 0.0]); x[0] += 1; x[1] += fpts(st_)
+        rec = {r: [0.0, 0.0] for r in rids}   # wins (ties .5), points for
+        for w in range(1, t + 1):
+            pts = {m["roster_id"]: m.get("points") or 0.0 for m in M[w]}
+            for a, b in pairs(w):
+                rec[a][1] += pts[a]; rec[b][1] += pts[b]
+                if pts[a] > pts[b]: rec[a][0] += 1
+                elif pts[b] > pts[a]: rec[b][0] += 1
+                else: rec[a][0] += .5; rec[b][0] += .5
+        roster = {m["roster_id"]: m.get("players") or [] for m in M[nxt]}
+
+        def rate(pid):
+            e = pj[nxt].get(pid)
+            if not e:
+                return None, None
+            pr = max(0.0, fpts(e.get("stats") or {}))
+            return pr, e.get("team") or (P.get(pid) or {}).get("team")
+
+        def last_rate(pid):  # most recent positive projection up to week t+1 (for players out that week)
+            for w in range(nxt, 0, -1):
+                e = pj[w].get(pid)
+                if e:
+                    v = max(0.0, fpts(e.get("stats") or {}))
+                    if v > 0:
+                        return v, e.get("team")
+            return 0.0, (P.get(pid) or {}).get("team")
+        weeks = list(range(nxt, reg_end + 1))
+        mu = {w: {} for w in weeks}
+        for r in rids:
+            vals = {}
+            for pid in roster.get(r, []):
+                pr, tm = rate(pid)
+                out_now = not pr
+                if out_now:
+                    pr, tm = last_rate(pid)
+                g = pg.get(pid)
+                wt = W_SEASON * min(1.0, g[0] / 4.0) if g and g[0] >= MIN_GP and pr else 0.0  # small samples count less
+                v = wt * g[1] / g[0] + (1 - wt) * pr if wt else pr
+                lt = LT.get(pid)
+                vals[pid] = (v, tm, out_now, lt)
+            for w in weeks:
+                c = []
+                for pid, (v, tm, out_now, lt) in vals.items():
+                    if tm not in games.get(w, ()):
+                        continue
+                    if out_now and (w == nxt or (lt and (lt["back"] == "season" or w < lt["back"]["week"]))):
+                        continue
+                    c.append((v, (P.get(pid) or {}).get("position") or "", pid))
+                mu[w][r] = lineup(slots, c)[0]
+        if t >= 1:  # scale to the league's real scoring level so far
+            lg = sum(rec[r][1] for r in rids) / (t * len(rids))
+            k = lg / (sum(mu[w][r] for w in weeks for r in rids) / (len(weeks) * len(rids)))
+            for w in weeks:
+                for r in rids:
+                    mu[w][r] *= k
+        rng = random.Random(1000 + t)
+        po, bye = {r: 0 for r in rids}, {r: 0 for r in rids}
+        PR = {w: pairs(w) for w in weeks}
+        for _ in range(sims):
+            W = {r: rec[r][0] for r in rids}; F = {r: rec[r][1] for r in rids}
+            off = {r: rng.gauss(0, TAU) if TAU else 0.0 for r in rids}
+            for w in weeks:
+                for a, b in PR[w]:
+                    x, y = rng.gauss(mu[w][a] + off[a], sd), rng.gauss(mu[w][b] + off[b], sd)
+                    F[a] += x; F[b] += y
+                    if x > y: W[a] += 1
+                    elif y > x: W[b] += 1
+                    else: W[a] += .5; W[b] += .5
+            order = sorted(rids, key=lambda r: (-W[r], -F[r]))
+            for i, r in enumerate(order[:nplay]):
+                po[r] += 1
+                if i < 2: bye[r] += 1
+        out.append(dict(week=t, po={r: round(po[r] / sims * 100, 1) for r in rids}, bye={r: round(bye[r] / sims * 100, 1) for r in rids}))
+        S.log("history after week %d done" % t)
+    return out
+
+
 def main():
     sims = int(sys.argv[1]) if len(sys.argv) > 1 else 10000
     L = get("/v1/league/%s" % LEAGUE)
@@ -255,8 +351,11 @@ def main():
         x["sos_rank"] = i + 1
     for i, x in enumerate(sorted(rows, key=lambda x: -x["strength"])):
         x["str_rank"] = i + 1
+    hist = [] if os.environ.get("FH_POWER_NO_HISTORY") else history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT, P, sd, sims)
+    by_r = {x["rid"]: x for x in rows}
+    hist.append(dict(week=cur, live=True, po={r: by_r[r]["playoff"] for r in rids}, bye={r: by_r[r]["bye"] for r in rids}))
     now = datetime.datetime.now(datetime.timezone.utc)
-    data = dict(season=season, asof=now.strftime("%Y-%m-%dT%H:%M:%SZ"), last=last, cur=cur, reg_end=reg_end, pstart=pstart, end=end,
+    data = dict(hist=hist, season=season, asof=now.strftime("%Y-%m-%dT%H:%M:%SZ"), last=last, cur=cur, reg_end=reg_end, pstart=pstart, end=end,
                 sims=sims, sd=round(sd, 1), k=round(k, 3), w_season=W_SEASON, pw=PW, nplay=nplay,
                 locked_games=sorted({tm for (w, tm) in done | live if w == cur}),
                 teams=rows)

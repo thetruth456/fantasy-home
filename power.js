@@ -56,6 +56,29 @@ h.push('<div class="scroll"><table><thead><tr><th>Rank</th><th>Ben\u2019s rank</
 T.forEach(function(t,i){h.push('<tr><td>'+t.rank+'</td><td>'+(BEN[t.rid]||'\u2013')+'</td><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+f1(t.pf)+'</td><td>'+pill(f1(t.strength),tS[i])+'</td><td>'+pr(t)+'</td><td>'+pill(pc(t.playoff),ptier(t.playoff,67,33))+'</td><td>'+pill(pc(t.first),ptier(t.first,20,5))+'</td><td>'+pill(pc(t.title),ptier(t.title,15,5))+'</td><td class="nt">'+note(t)+'</td></tr>')});
 h.push('</tbody></table></div></section>');
 
+/* ---- odds over time */
+var COL=["#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2","#17becf","#bcbd22","#555555","#0b3d91","#f0a8c0"];
+window.powerOdds=function(b,k){var box=b.closest(".odds");box.setAttribute("data-k",k);[].forEach.call(box.querySelectorAll(".seg button"),function(x){x.setAttribute("aria-pressed",x===b)})};
+window.powerFocus=function(el,rid){var box=el.closest(".odds"),on=box.getAttribute("data-f")===String(rid);box.setAttribute("data-f",on?"":rid);
+[].forEach.call(box.querySelectorAll("[data-r]"),function(x){x.classList.toggle("dim",!on&&x.getAttribute("data-r")!==String(rid))})};
+if(D.hist&&D.hist.length>1){
+var H=D.hist,W=560,Ht=280,ml=56,mr=20,mt=10,mb=26,n=H.length,cw=W-ml-mr,ch=Ht-mt-mb;
+function X(i){return ml+cw*i/(n-1)}function Y(v){return mt+ch*(1-v/100)}
+function xl(h){return h.live?"W"+h.week+"*":h.week===0?"Pre":"W"+h.week}
+var order=T.slice().sort(function(a,b){return b.playoff-a.playoff||b.bye-a.bye}),ci={};order.forEach(function(t,i){ci[t.rid]=COL[i%COL.length]});
+function svg(k){var g='<svg class="oc oc-'+k+'" viewBox="0 0 '+W+' '+Ht+'" role="img" aria-label="'+(k==="po"?"Playoff":"Bye")+' odds by week">';
+[0,25,50,75,100].forEach(function(v){g+='<line class="gl" x1="'+ml+'" x2="'+(W-mr)+'" y1="'+Y(v)+'" y2="'+Y(v)+'"/><text class="ax" x="'+(ml-5)+'" y="'+(Y(v)+4)+'" text-anchor="end">'+v+'%</text>'});
+H.forEach(function(h,i){g+='<text class="ax" x="'+X(i)+'" y="'+(Ht-8)+'" text-anchor="middle">'+xl(h)+'</text>'});
+order.slice().reverse().forEach(function(t){var pts=H.map(function(h,i){return X(i).toFixed(1)+","+Y(h[k][t.rid]).toFixed(1)}).join(" ");
+g+='<g data-r="'+t.rid+'" style="color:'+ci[t.rid]+'"><polyline points="'+pts+'"><title>'+esc(t.name)+'</title></polyline>';
+H.forEach(function(h,i){g+='<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(h[k][t.rid]).toFixed(1)+'" r="2.6"><title>'+esc(t.name)+', '+xl(h)+': '+pc(h[k][t.rid])+'</title></circle>'});g+='</g>'});
+return g+'</svg>'}
+h.push('<section class="odds" data-k="po"><h2>Odds through the season</h2><p class="cap">Each point reruns the simulation with only what was known after that week (records, rosters, stats, projections and injuries at the time). Pre = preseason; W'+D.cur+'* = now, week '+D.cur+' still in progress.</p>');
+h.push('<div class="seg"><button type="button" aria-pressed="true" onclick="powerOdds(this,\'po\')">Playoff %</button><button type="button" aria-pressed="false" onclick="powerOdds(this,\'bye\')">Bye %</button></div>');
+h.push('<div class="ocw">'+svg("po")+svg("bye")+'</div><div class="ol">');
+order.forEach(function(t){h.push('<span data-r="'+t.rid+'" onclick="powerFocus(this,'+t.rid+')"><i style="background:'+ci[t.rid]+'"></i>'+esc(t.name)+'</span>')});
+h.push('</div></section>')}
+
 /* ---- projected finish */
 h.push('<section><h2>Projected finish</h2><p class="cap">Where each team finished across the simulations. The number is the average final standing.</p>');
 h.push('<div class="lg"><span><i class="success"></i>Bye (seed 1\u20132)</span><span><i class="warning"></i>Playoffs (seed 3\u2013'+D.nplay+')</span><span><i></i>Out</span></div><div class="bars stk">');
@@ -75,6 +98,7 @@ h.push('</tbody></table></div></section>');
 h.push('<section><h2>Methodology</h2><ul class="meth">'+
 '<li><b>Strength:</b> each player = '+Math.round(D.w_season*100)+'% his points per game this season + '+Math.round((1-D.w_season)*100)+'% his Sleeper projection that week; a team = its best lineup from the current roster, so points from players now hurt, traded or dropped don\u2019t count. Byes, this week\u2019s Out/IR tags and long-term injuries count as zero.</li>'+
 '<li><b>Simulation:</b> '+D.sims.toLocaleString("en-US")+' runs of weeks '+D.cur+'\u2013'+D.reg_end+' on the real schedule; each score varies by \u00b1'+f1(D.sd)+' pts (the real week-to-week spread). Week '+D.cur+' keeps points already scored.</li>'+
+'<li><b>Odds through the season:</b> the same model rerun after each week using records, rosters, player points per game and that week\u2019s Sleeper projections as they were then (per-player points per game phased in over the first 4 games); preseason uses projections only.</li>'+
 '<li><b>Standings:</b> wins, then points for. Top '+D.nplay+' make it; seeds 1\u20132 get a bye; Sleeper\u2019s fixed bracket (no reseeding); title odds simulate weeks '+D.pstart+'\u2013'+D.end+'.</li>'+
 '<li><b>Caveat:</b> projections and injury timelines are estimates, and future trades and waiver moves aren\u2019t modeled. Data: Sleeper.</li></ul></section>');
 return h.join("");

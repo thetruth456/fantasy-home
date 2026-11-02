@@ -42,9 +42,9 @@ h.push('<li>Hit hardest by injuries: '+who(hb)+', '+gms(hb.inj_games)+' lost'+(h
 h.push('</ul></section>');
 
 /* ---- luck index table */
-var li=tiers(T.map(function(t){return t.idx}),true),lw=tiers(T.map(function(t){return t.luck}),true),lb=tiers(T.map(function(t){return t.inj_bill}),false);
-h.push('<section><h2>Luck index</h2><p class="cap">Luck index = the average of two z-scores: wins above expected (actual wins minus all-play expected wins) and the injury bill (reversed, so fewer injuries is luckier). Positive is lucky; green to red is relative to the 12 teams.</p><div class="scroll"><table><thead><tr><th>Rank</th><th>Team</th><th>Manager</th><th>Record</th><th>Expected wins</th><th>Wins above expected</th><th>All-play</th><th>Luck index</th><th>Points for</th><th>Points against</th><th>Injury bill</th></tr></thead><tbody>');
-T.forEach(function(t,i){h.push('<tr><td>'+t.rank+'</td><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+f1(t.xw)+'</td><td>'+pill(sg(t.luck,1),lw[i])+'</td><td>'+rec(t.apw,t.apl,t.apt)+'</td><td>'+pill(sg(t.idx,2),li[i])+'</td><td>'+f1(t.pf)+'</td><td>'+f1(t.pa)+'</td><td>'+pill(f1(t.inj_bill),lb[i])+'</td></tr>')});
+var li=tiers(T.map(function(t){return t.idx}),true),lw=tiers(T.map(function(t){return t.luck}),true),lb=tiers(T.map(function(t){return t.inj_bill}),false),lm=tiers(T.map(function(t){return t.bye_gain||0}),true);
+h.push('<section><h2>Luck index</h2><p class="cap">Luck index = the average of two z-scores: wins above expected (actual wins minus all-play expected wins) and the injury bill (reversed, so fewer injuries is luckier). Positive is lucky; green to red is relative to the 12 teams. Bye Week Merchant (not in the index) = points opponents lost to NFL byes the week they played this team.</p><div class="scroll"><table><thead><tr><th>Rank</th><th>Team</th><th>Manager</th><th>Record</th><th>Expected wins</th><th>Wins above expected</th><th>All-play</th><th>Luck index</th><th>Points for</th><th>Points against</th><th>Injury bill</th><th>Bye Week Merchant</th></tr></thead><tbody>');
+T.forEach(function(t,i){h.push('<tr><td>'+t.rank+'</td><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+f1(t.xw)+'</td><td>'+pill(sg(t.luck,1),lw[i])+'</td><td>'+rec(t.apw,t.apl,t.apt)+'</td><td>'+pill(sg(t.idx,2),li[i])+'</td><td>'+f1(t.pf)+'</td><td>'+f1(t.pa)+'</td><td>'+pill(f1(t.inj_bill),lb[i])+'</td><td>'+(t.bye_gain==null?'\u2014':pill('+'+f1(t.bye_gain),lm[i])+(t.bye_wins?' <span class="inj">('+t.bye_wins+' win'+(t.bye_wins>1?'s':'')+')</span>':''))+'</td></tr>')});
 h.push('</tbody></table></div></section>');
 
 /* ---- injuries */
@@ -83,6 +83,7 @@ if(rb)A.push(["Robbed","<b>"+nm(rb[0])+"</b>: lost with "+rb[1].toFixed(2)+" to 
 if(st)A.push(["Stole One","<b>"+nm(st[0])+"</b>: beat "+nm(st[2])+" with "+st[1].toFixed(2)+" (week "+st[4]+")."]);
 if(bl)A.push(["Mercy Rule","<b>"+nm(bl[0])+"</b>: lost by "+(bl[3]-bl[1]).toFixed(2)+" to "+nm(bl[2])+" (week "+bl[4]+")."]);
 g=top("bottom",true);if(g[0].bottom)aw("Participation Trophy",g,"league\u2019s lowest scorer in "+gms(g[0].bottom).replace("game","week")+".");
+if(T[0].bye_gain!=null){g=top("bye_gain",true);aw("Bye Week Merchant",g,"opponents lost "+f1(g[0].bye_gain)+" pts to NFL byes against them"+(g[0].bye_wins?" ("+g[0].bye_wins+" win"+(g[0].bye_wins>1?"s":"")+" by less than that)":"")+".")}
 g=top("inj_bill",true);aw("Ambulance on Speed Dial",g,"biggest injury bill ("+f1(g[0].inj_bill)+", "+gms(g[0].inj_games)+").");
 g=top("inj_bill",false);aw("Bubble Wrap",g,"smallest injury bill ("+f1(g[0].inj_bill)+", "+gms(g[0].inj_games)+").");
 g=top("inj_bill_co",true);if(g[0].inj_bill_co)aw("Dark Clouds Ahead",g,"most injury pain still coming ("+f1(g[0].inj_bill_co)+", "+gms(g[0].inj_games_co)+").");
@@ -98,6 +99,7 @@ h.push('</div></section>');
 h.push('<section><h2>Methodology</h2><ul class="meth">'+
 '<li><b>Expected wins:</b> each week, the share of the other 11 teams a team outscored, summed. Records and scores: '+wk.toLowerCase()+'.</li>'+
 '<li><b>Games lost:</b> a drafted player\u2019s NFL team played and he didn\u2019t (byes and a coach\u2019s decision excluded). Week '+D.cur+': Out/IR/PUP players count. Future: reported timelines through week '+D.end+' (season-ending = every game; ranges use the midpoint, counted from the injury week).</li>'+
+'<li><b>Bye Week Merchant:</b> each week, the opponent\u2019s best lineup from his whole roster on season points per game, minus the same without players on bye; summed. (N wins) = wins by less than that.</li>'+
 '<li><b>Who pays:</b> the team holding the player that week (last holder if he was dropped). Pick value comes from the original draft pick.</li>'+
 '<li><b>Caveat:</b> Sleeper has no injury history, so causes of past misses aren\u2019t confirmed, and return dates are estimates. Data: Sleeper, plus news reports for timelines.</li></ul></section>');
 return h.join("");
