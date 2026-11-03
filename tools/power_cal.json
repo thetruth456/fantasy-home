@@ -1,0 +1,155 @@
+{
+ "pooled": {
+  "beta0": 0.58,
+  "beta0_se": 0.21,
+  "beta_c": 20.5,
+  "tau0": 5.4,
+  "v_inj": 6.47,
+  "pre_slope": 0.96,
+  "sig_draft": 4.27,
+  "n": 86,
+  "n_keep": 48,
+  "seasons": [
+   "Best League 2025",
+   "Best League 2024",
+   "Best League 2023",
+   "Best League 2022",
+   "ZBT 2025",
+   "Oopsilons 2025",
+   "Oopsilons 2024"
+  ]
+ },
+ "own": {
+  "best": {
+   "beta0": 0.51,
+   "beta0_se": 0.25,
+   "beta_c": 7.6,
+   "tau0": 5.5,
+   "v_inj": 5.18,
+   "pre_slope": 0.95,
+   "sig_draft": 4.68,
+   "n": 48,
+   "n_keep": 36,
+   "seasons": [
+    "Best League 2025",
+    "Best League 2024",
+    "Best League 2023",
+    "Best League 2022"
+   ]
+  },
+  "zbt": {
+   "beta0": 0.53,
+   "beta0_se": 1.16,
+   "beta_c": 39.9,
+   "tau0": 6.1,
+   "v_inj": 10.02,
+   "pre_slope": null,
+   "sig_draft": null,
+   "n": 14,
+   "n_keep": 0,
+   "seasons": [
+    "ZBT 2025"
+   ]
+  },
+  "oops": {
+   "beta0": 0.8,
+   "beta0_se": 0.46,
+   "beta_c": 29.1,
+   "tau0": 5.7,
+   "v_inj": 6.96,
+   "pre_slope": 0.98,
+   "sig_draft": 3.07,
+   "n": 24,
+   "n_keep": 12,
+   "seasons": [
+    "Oopsilons 2025",
+    "Oopsilons 2024"
+   ]
+  },
+  "spacex": null
+ },
+ "use": {
+  "best": {
+   "beta0": 0.51,
+   "beta0_se": 0.25,
+   "beta_c": 7.6,
+   "tau0": 5.5,
+   "v_inj": 5.18,
+   "pre_slope": 0.95,
+   "sig_draft": 4.68,
+   "n": 48,
+   "n_keep": 36,
+   "seasons": [
+    "Best League 2025",
+    "Best League 2024",
+    "Best League 2023",
+    "Best League 2022"
+   ],
+   "source": "own"
+  },
+  "zbt": {
+   "beta0": 0.58,
+   "beta0_se": 0.21,
+   "beta_c": 20.5,
+   "tau0": 5.4,
+   "v_inj": 6.47,
+   "pre_slope": 0.96,
+   "sig_draft": 4.27,
+   "n": 86,
+   "n_keep": 48,
+   "seasons": [
+    "Best League 2025",
+    "Best League 2024",
+    "Best League 2023",
+    "Best League 2022",
+    "ZBT 2025",
+    "Oopsilons 2025",
+    "Oopsilons 2024"
+   ],
+   "source": "pooled"
+  },
+  "oops": {
+   "beta0": 0.58,
+   "beta0_se": 0.21,
+   "beta_c": 20.5,
+   "tau0": 5.4,
+   "v_inj": 6.47,
+   "pre_slope": 0.96,
+   "sig_draft": 4.27,
+   "n": 86,
+   "n_keep": 48,
+   "seasons": [
+    "Best League 2025",
+    "Best League 2024",
+    "Best League 2023",
+    "Best League 2022",
+    "ZBT 2025",
+    "Oopsilons 2025",
+    "Oopsilons 2024"
+   ],
+   "source": "pooled"
+  },
+  "spacex": {
+   "beta0": 0.58,
+   "beta0_se": 0.21,
+   "beta_c": 20.5,
+   "tau0": 5.4,
+   "v_inj": 6.47,
+   "pre_slope": 0.96,
+   "sig_draft": 4.27,
+   "n": 86,
+   "n_keep": 48,
+   "seasons": [
+    "Best League 2025",
+    "Best League 2024",
+    "Best League 2023",
+    "Best League 2022",
+    "ZBT 2025",
+    "Oopsilons 2025",
+    "Oopsilons 2024"
+   ],
+   "source": "pooled"
+  }
+ },
+ "min_own": 36
+}

@@ -1,7 +1,9 @@
-"""One-off generator for the Best League "Podcast: Power Rankings" tab (static snapshot).
+"""One-off generator for the "Podcast: Power Rankings" tab (static snapshot), one file per league (tools/leagues.py).
 
-Not run by the update workflow. Writes best-power-data.js (window.POWER.best). Stdlib only.
-Usage: python tools/power.py [sims]   (default 10000)
+Not run by the update workflow. Writes <key>-power-data.js (window.POWER[key]), e.g. best-power-data.js. Stdlib only.
+Usage: python tools/power.py [--league best|zbt|oops|spacex|all] [sims]   (default league best, 10000 sims)
+League settings come from Sleeper: scoring, lineup slots, league size, playoff start, and the winners bracket
+(seeds, byes and pairings are read from Sleeper's bracket). Calibration: tools/power_cal.json (tools/power_calibrate.py).
 Model (also summarized on the page):
   each rostered player's weekly value = his own 2026 points per game (weight gp/(gp+G0)) + his Sleeper projection
   for that week (the rest). Each simulated season adds a persistent team-strength offset (see TAU0 / tau_k). Team weekly mean = best legal lineup from the
@@ -12,7 +14,7 @@ Model (also summarized on the page):
   This week (in progress): starters whose NFL game is final keep their real points; open slots use the best lineup
   from players who have not played yet. Weekly noise = the spread of real scores around each team's average (less the part
   future injuries now explain). Future weeks also draw random injuries per player (tools/injury.py); lineups re-form from the bench.
-  Standings: wins (ties = half), then points for. Playoffs: 6 teams, seeds 1-2 bye, fixed bracket.
+  Standings: wins (ties = half), then points for. Playoffs: Sleeper's fixed winners bracket (no reseeding).
 """
 import json, os, sys, math, random, datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -20,20 +22,21 @@ import sources as S
 import podcast as PC
 import draftprior as DP
 import injury as INJ
+import leagues as LG
 
-LEAGUE = PC.LEAGUE
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(os.environ.get("FH_OUT_DIR") or ROOT, "best-power-data.js")
 CACHE = os.environ.get("FH_CACHE_DIR") or os.path.join(ROOT, ".cache")
 G0 = 7.0                  # player level: weight on his 2026 points per game = gp / (gp + G0), rest = Sleeper projection
                           # (1 game 13%, 4 games 36%, 7 games 50%, 13 games 65%: more projection early, more real points later)
-# Bayesian team strength, calibrated on Best League 2022-2025 (48 team-seasons; reproduce with tools/power_calibrate.py):
+# Bayesian team strength. Constants per league from tools/power_cal.json (tools/power_calibrate.py --write): a league with
+# 36+ team-seasons of its own history uses its own fit (Best League 2022-2025, 48), the others the fit pooled over every
+# league's history (86 team-seasons). Numbers below are Best League's:
 # * Future injuries are simulated (tools/injury.py): every player can miss games at Sleeper-measured per-game rates, for a
 #   drawn number of games, and the best lineup re-forms from the rest of the roster (plus a waiver fill-in). A team's
 #   expected value = its lineup averaged over those injury paths, so depth counts; each simulated season then follows one path.
 # * Prior = the draft. Post-draft value (tools/draftprior.py, injury-averaged) predicts real season PPG with slope BETA0 = 0.51
-#   (se 0.25). What it misses has sd 8.0; after removing week-to-week noise and the injury paths' own spread (the sim adds
-#   those explicitly) that leaves TAU0 = 4.6 pts/wk (trades, waivers, breakouts and busts).
+#   (se 0.25). What it misses has sd 8.0; after removing week-to-week noise (that season's own weekly sd, ~19.9) and the
+#   injury paths' own spread (the sim adds those explicitly) that leaves TAU0 = 5.5 pts/wk (trades, waivers, breakouts, busts).
 # * Pre-draft = keeper surplus only, times PRE_SLOPE = 0.95 (how post-draft value tracked keeper surplus), plus the spread of
 #   how drafts deviate from that (SIG_DRAFT = 4.68 pts/wk) and the injury spread (V_INJ = 5.18, its rosters are unknown) as
 #   extra uncertainty.
@@ -44,8 +47,23 @@ G0 = 7.0                  # player level: weight on his 2026 points per game = g
 #   (normal-normal update with weekly noise sd). Weekly noise is reduced to sqrt(sd^2 - injury week-to-week variance) so the
 #   total weekly spread still matches real scores.
 # (Without the injury model the same calibration gives BETA0 0.49, C 8.3, TAU0 5.1, SIG_DRAFT 4.75, slope 1.04.)
-BETA0, BETA_C, SIG_DRAFT, PRE_SLOPE, V_INJ = 0.51, 7.6, 4.68, 0.95, 5.18
-TAU0 = float(os.environ.get("FH_POWER_TAU0", "4.6"))
+BETA0, BETA_C, SIG_DRAFT, PRE_SLOPE, V_INJ, TAU0 = 0.51, 7.6, 4.68, 0.95, 5.18, 5.5
+CAL_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "power_cal.json")
+CAL = {}
+
+
+def set_cal(key):
+    """Load the league's constants from power_cal.json (FH_POWER_TAU0 overrides TAU0)."""
+    global BETA0, BETA_C, SIG_DRAFT, PRE_SLOPE, V_INJ, TAU0, CAL
+    with open(CAL_FILE) as f:
+        CAL = json.load(f)["use"][key]
+    BETA0, BETA_C, SIG_DRAFT, PRE_SLOPE, V_INJ, TAU0 = (CAL[k] for k in ("beta0", "beta_c", "sig_draft", "pre_slope", "v_inj", "tau0"))
+    fz = LG.FROZEN.get(key) or {}
+    if "tau0" in fz:   # frozen league (leagues.FROZEN): keep the live model's TAU0
+        TAU0 = CAL["tau0"] = fz["tau0"]
+        CAL = dict(CAL, frozen=True)
+    if os.environ.get("FH_POWER_TAU0"):
+        TAU0 = float(os.environ["FH_POWER_TAU0"])
 NPATH = int(os.environ.get("FH_POWER_PATHS", "2000"))   # injury paths per team (each simulated season picks one)
 
 
@@ -102,7 +120,7 @@ def phi(x):
     return 0.5 * (1 + math.erf(x / math.sqrt(2)))
 
 
-def history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT, P, sd, sims, prior):
+def history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT, P, sd, sims, prior, nbye=2):
     """Playoff / bye odds as they looked after each completed week t = 0 (preseason) .. last, using only what was known then:
     records and points for through week t, each team's roster going into week t+1 (Sleeper matchup data), player points per
     game through week t (blended with projection by games played), team-strength uncertainty tau_k(t), and Sleeper's week t+1 projection as each
@@ -120,7 +138,7 @@ def history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT
             pre = t < 0
             out.append(dict(week=t, **sim_odds({w: {r: 100.0 + (BETA0 * PRE_SLOPE * pre_dev[r] if pre else BETA0 * post_dev[r]) for r in rids} for w in range(1, reg_end + 1)},
                                                {r: [0.0, 0.0] for r in rids}, rids, pairs, nplay, sd if pre else math.sqrt(sd ** 2 - vw0),
-                                               tau_pre() if pre else TAU0, sims, 1000 + t, None if pre else paths0)))
+                                               tau_pre() if pre else TAU0, sims, 1000 + t, None if pre else paths0, nbye=nbye)))
             S.log("history %s done" % ("pre-draft" if t < 0 else "post-draft"))
             continue
         nxt = t + 1
@@ -200,12 +218,12 @@ def history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT
             lw = sum(mu[w].values()) / len(rids)
             for r in rids:
                 mu[w][r] = lw + b * (mu[w][r] - lw)
-        out.append(dict(week=t, **sim_odds(mu, rec, rids, pairs, nplay, math.sqrt(sd ** 2 - k * k * vw), tau_k(t, sd), sims, 1000 + t, PT, k)))
+        out.append(dict(week=t, **sim_odds(mu, rec, rids, pairs, nplay, math.sqrt(sd ** 2 - k * k * vw), tau_k(t, sd), sims, 1000 + t, PT, k, nbye)))
         S.log("history after week %d done" % t)
     return out
 
 
-def sim_odds(mu, rec, rids, pairs, nplay, sd, tk, sims, seed, inj=None, k=1.0):
+def sim_odds(mu, rec, rids, pairs, nplay, sd, tk, sims, seed, inj=None, k=1.0, nbye=2):
     """inj: {rid: [path {week: lineup change vs expected}]} (one path drawn per team per simulated season), scaled by k."""
     rng, irng = random.Random(seed), random.Random(seed + 77)   # separate stream for injury paths: same scoring draws as without
     weeks = sorted(mu)
@@ -226,12 +244,52 @@ def sim_odds(mu, rec, rids, pairs, nplay, sd, tk, sims, seed, inj=None, k=1.0):
         order = sorted(rids, key=lambda r: (-W[r], -F[r]))
         for i, r in enumerate(order[:nplay]):
             po[r] += 1
-            if i < 2: bye[r] += 1
+            if i < nbye: bye[r] += 1
     return dict(po={r: round(po[r] / sims * 100, 1) for r in rids}, bye={r: round(bye[r] / sims * 100, 1) for r in rids})
 
 
-def main():
-    sims = int(sys.argv[1]) if len(sys.argv) > 1 else 10000
+def bracket(league_id, order, nplay):
+    """Sleeper's winners bracket as seed-based matches on the path to the title.
+    order = current standings (roster ids, best first; Sleeper fills its bracket from the same standings).
+    Returns (matches sorted by round: dict(m, r, a, b, final) with a side = ("s", seed) or ("w", match), number of byes)."""
+    B = get("/v1/league/%s/winners_bracket" % league_id) or []
+    seed = {r: i + 1 for i, r in enumerate(order)}
+    by = {x["m"]: x for x in B}
+    fin = [x for x in B if x.get("p") == 1]
+
+    def side(x, n):
+        if x.get("t%d_from" % n):
+            f = x["t%d_from" % n]
+            return ("w", f["w"]) if "w" in f else None
+        t = x.get("t%d" % n)
+        return ("s", seed[t]) if t in seed else None
+    out, need = {}, [fin[0]["m"]] if fin else []
+    while need:
+        m = need.pop()
+        x = by[m]
+        a, b = side(x, 1), side(x, 2)
+        if not a or not b:
+            out = None
+            break
+        out[m] = dict(m=m, r=x["r"], a=a, b=b, final=x.get("p") == 1)
+        need += [s[1] for s in (a, b) if s[0] == "w"]
+    seeds = sorted(s[1] for x in (out or {}).values() for s in (x["a"], x["b"]) if s[0] == "s")
+    if not out or seeds != list(range(1, nplay + 1)):
+        if nplay != 6:
+            raise SystemExit("could not read the winners bracket from Sleeper")
+        S.log("winners bracket not filled in yet: using the standard 6-team bracket")
+        out = {1: dict(m=1, r=1, a=("s", 4), b=("s", 5), final=False), 2: dict(m=2, r=1, a=("s", 3), b=("s", 6), final=False),
+               3: dict(m=3, r=2, a=("s", 1), b=("w", 1), final=False), 4: dict(m=4, r=2, a=("s", 2), b=("w", 2), final=False),
+               5: dict(m=5, r=3, a=("w", 3), b=("w", 4), final=True)}
+    ms = sorted(out.values(), key=lambda x: (x["r"], x["m"]))
+    r1 = {s[1] for x in ms if x["r"] == 1 for s in (x["a"], x["b"]) if s[0] == "s"}
+    return ms, nplay - len(r1)
+
+
+def main(lg, sims=10000):
+    LEAGUE, KEY = lg["id"], lg["key"]
+    OUT = PC.out_path(KEY, "power")
+    set_cal(KEY)
     L = get("/v1/league/%s" % LEAGUE)
     season, st = L["season"], L["settings"]
     last = int(st.get("last_scored_leg") or 0)
@@ -239,9 +297,8 @@ def main():
     pstart = int(st.get("playoff_week_start") or 15)
     reg_end = pstart - 1
     nplay = int(st.get("playoff_teams") or 6)
-    if nplay != 6 or st.get("playoff_round_type") not in (0, None):
-        raise SystemExit("bracket model assumes 6 teams, one week per round")
-    end = pstart + 2
+    if st.get("playoff_round_type") not in (0, None):
+        raise SystemExit("bracket model assumes one week per playoff round")
     Sc = L["scoring_settings"]
     slots = [x for x in L["roster_positions"] if x not in ("BN", "IR", "TAXI")]
 
@@ -281,13 +338,15 @@ def main():
     lg_ppg = sum(ppg.values()) / len(rids)
     res = [s - ppg[r] for r in rids for s in rec[r]["scores"]]
     sd = math.sqrt(sum(x * x for x in res) / (len(res) - len(rids)))
+    BR, nbye = bracket(LEAGUE, sorted(rids, key=lambda r: (-(rec[r]["w"] + .5 * rec[r]["t"]), -rec[r]["pf"])), nplay)
+    end = pstart + max(x["r"] for x in BR) - 1
 
     # ---------------- projections (current rosters, injuries applied)
     P = S.sleeper_players(CACHE)
     sched = S.sleeper_schedule(season)
     done = {(g["week"], tm) for g in sched if g.get("status") == "complete" for tm in (g["home"], g["away"])}
     live = {(g["week"], tm) for g in sched if g.get("status") == "in_progress" for tm in (g["home"], g["away"])}
-    LT = PC.LONG_TERM
+    LT = PC.long_term(KEY)
     proj = {}
     for w in range(cur, end + 1):
         proj[w] = {e["player_id"]: e for e in S.sleeper_projections(season, w, "regular") if e.get("player_id")}
@@ -299,7 +358,7 @@ def main():
         lt = LT.get(pid)
         if lt and (lt["back"] == "season" or w < lt["back"]["week"]):
             return 0.0
-        if w == cur and (P.get(pid) or {}).get("injury_status") in PC.RULED_OUT:
+        if w == cur and PC.ruled_out(pid, (P.get(pid) or {}).get("injury_status"), KEY):
             return 0.0
         return max(0.0, fpts(e.get("stats") or {}))
 
@@ -414,11 +473,14 @@ def main():
             def g(a, b, w):
                 x, y = rng.gauss(mu[w][a] + off[a] + k * ip[a][w], sd_e), rng.gauss(mu[w][b] + off[b] + k * ip[b][w], sd_e)
                 return a if x >= y else b
-            # Sleeper's winners bracket (fixed, no reseeding): 4v5 and 3v6, then 1 v (4/5) and 2 v (3/6)
-            q1, q2 = g(s_[3], s_[4], pstart), g(s_[2], s_[5], pstart)
-            f1, f2 = g(s_[0], q1, pstart + 1), g(s_[1], q2, pstart + 1)
-            final[f1] += 1; final[f2] += 1
-            title[g(f1, f2, pstart + 2)] += 1
+            # Sleeper's winners bracket (fixed, no reseeding), read from the league (see bracket())
+            won = {}
+            for x in BR:
+                a, b = (s_[sd_[1] - 1] if sd_[0] == "s" else won[sd_[1]] for sd_ in (x["a"], x["b"]))
+                won[x["m"]] = g(a, b, pstart + x["r"] - 1)
+                if x["final"]:
+                    final[a] += 1; final[b] += 1
+                    title[won[x["m"]]] += 1
         return seedc, finc, title, final, wins_sum
     seedc, finc, title, final, wins_sum = simulate(random.Random(20261031), lambda w: PR[w], sims, True)
 
@@ -436,7 +498,7 @@ def main():
         rows.append(dict(rid=r, name=t["name"], user=t["user"], w=R["w"], l=R["l"], t=R["t"], pf=round(R["pf"], 1), pa=round(R["pa"], 1),
                          ppg=round(ppg[r], 1), proj=round(sum(lineup(slots, [(ppts(p, w), pos(p), p) for p in team[r]["players"]])[0] for w in fut) / len(fut), 1), strength=round(strength[r], 1), ap=round(ap[r], 1),
                          pwins=round(wins_sum[r] / sims, 2), games=reg_end,
-                         playoff=round(po, 1), first=round(seedc[r][0] / sims * 100, 1), bye=round((seedc[r][0] + seedc[r][1]) / sims * 100, 1),
+                         playoff=round(po, 1), first=round(seedc[r][0] / sims * 100, 1), bye=round(sum(seedc[r][:nbye]) / sims * 100, 1),
                          final=round(final[r] / sims * 100, 1),
                          po_neutral=round(sum(nseed[r]) / sims * 100, 1), first_neutral=round(nseed[r][0] / sims * 100, 1), title=round(title[r] / sims * 100, 1),
                          seeds=[round(c / sims * 100, 1) for c in seedc[r]], finish=[round(c / sims * 100, 1) for c in finc[r]],
@@ -460,8 +522,9 @@ def main():
     drafts = get("/v1/league/%s/drafts" % LEAGUE)
     picks = get("/v1/draft/%s/picks" % drafts[0]["draft_id"])
     sproj = DP.season_projections(season)
-    post_dev, pre_dev, keep = DP.values(sproj, picks, slots, fpts, lineup)
-    PV = DP.player_values(sproj, fpts)
+    adp = LG.adp_key(Sc)
+    post_dev, pre_dev, keep = DP.values(sproj, picks, slots, fpts, lineup, adp, len(rids))
+    PV = DP.player_values(sproj, fpts, adp)
     dc = DP.rosters(PV, picks)
     allw = list(range(1, reg_end + 1))
     E0, PT0, vw0 = inj_model(slots, {w: dc for w in allw}, allw, INJ.fa_floor([(q["v"], q["pos"], pid) for pid, q in PV.items()], {p["player_id"] for p in picks}), rids, 999)
@@ -472,19 +535,27 @@ def main():
         x["keepers"] = keep.get(x["rid"], [])
         x["draft_dev"], x["keeper_dev"], x["draft_inj_dev"] = round(post_dev[x["rid"]], 1), round(pre_dev[x["rid"]], 1), round(inj_dev[x["rid"]], 1)
         x["inj_cost"], x["inj_sd"] = round(inj_cost[x["rid"]], 1), round(inj_sd[x["rid"]], 1)
-    hist = [] if os.environ.get("FH_POWER_NO_HISTORY") else history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT, P, sd, sims, (inj_dev, pre_dev, PT0, vw0))
+    hist = [] if os.environ.get("FH_POWER_NO_HISTORY") else history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT, P, sd, sims, (inj_dev, pre_dev, PT0, vw0), nbye)
     by_r = {x["rid"]: x for x in rows}
     hist.append(dict(week=cur, live=True, po={r: by_r[r]["playoff"] for r in rids}, bye={r: by_r[r]["bye"] for r in rids}))
     now = datetime.datetime.now(datetime.timezone.utc)
-    data = dict(hist=hist, season=season, asof=now.strftime("%Y-%m-%dT%H:%M:%SZ"), last=last, cur=cur, reg_end=reg_end, pstart=pstart, end=end,
+    def sdesc(x):
+        return "seed %d" % x[1] if x[0] == "s" else "W%d" % x[1]
+    data = dict(key=KEY, title=lg["name"], league=L["name"], nteams=len(rids), nbye=nbye, scoring=LG.adp_key(Sc).replace("adp_", ""),
+                bracket=[dict(r=x["r"], m=x["m"], a=sdesc(x["a"]), b=sdesc(x["b"]), final=x["final"]) for x in BR],
+                cal=dict(source=CAL["source"], n=CAL["n"], seasons=CAL["seasons"], beta_c=BETA_C, pre_slope=PRE_SLOPE, sig_draft=SIG_DRAFT, v_inj=V_INJ),
+                keepers_n=sum(len(v) for v in keep.values()),
+                hist=hist, season=season, asof=now.strftime("%Y-%m-%dT%H:%M:%SZ"), last=last, cur=cur, reg_end=reg_end, pstart=pstart, end=end,
                 sims=sims, sd=round(sd, 1), k=round(k, 3), g0=G0, w_now=round(blend_w(last), 2), tau0=TAU0, tau_now=round(TK, 1), tau_pre=round(tau_pre(), 1), beta0=BETA0, sd_noise=round(sd_e, 1), npath=NPATH, inj_hazard=INJ.HAZARD, beta_now=round(B, 2), draft_type=drafts[0].get("type"), pw=PW, nplay=nplay,
                 locked_games=sorted({tm for (w, tm) in done | live if w == cur}),
                 teams=rows)
     with open(OUT, "w") as f:
         f.write("/* Static snapshot generated by tools/power.py. The update workflow does not touch this file. */\n")
-        f.write("window.POWER=window.POWER||{};\nwindow.POWER.best=" + json.dumps(data, separators=(",", ":"), ensure_ascii=False) + ";\n")
+        f.write("window.POWER=window.POWER||{};\nwindow.POWER[%s]=" % json.dumps(KEY) + json.dumps(data, separators=(",", ":"), ensure_ascii=False) + ";\n")
     S.log("wrote %s (weeks %d-%d left, %d sims, sd %.1f -> %.1f with injuries, k %.3f, tau %.1f)" % (OUT, cur, reg_end, sims, sd, sd_e, k, TK))
 
 
 if __name__ == "__main__":
-    main()
+    args = sys.argv[1:]
+    for lg in LG.pick(args):
+        main(lg, int(args[0]) if args else 10000)

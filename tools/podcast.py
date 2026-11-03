@@ -1,15 +1,20 @@
-"""One-off generator for the Best League "Podcast" luck report (static snapshot).
+"""One-off generator for the "Podcast" luck report (static snapshot), one file per league (tools/leagues.py).
 
-Not run by the update workflow. Writes best-podcast-data.js (window.PODCAST.best).
-Usage: python tools/podcast.py [last_week]   (default: Sleeper's last fully scored week)
+Not run by the update workflow. Writes <key>-podcast-data.js (window.PODCAST[key]), e.g. best-podcast-data.js.
+Usage: python tools/podcast.py [--league best|zbt|oops|spacex|all] [last_week]
+       (default league best; default week: Sleeper's last fully scored week)
 """
 import json, os, sys, math, datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sources as S
+import leagues as LG
 
-LEAGUE = "1389358450705727488"
+LEAGUE = LG.BY_KEY["best"]["id"]
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(os.environ.get("FH_OUT_DIR") or ROOT, "best-podcast-data.js")
+
+
+def out_path(key, kind):
+    return os.path.join(os.environ.get("FH_OUT_DIR") or ROOT, "%s-%s-data.js" % (key, kind))
 CACHE = os.environ.get("FH_CACHE_DIR") or os.path.join(ROOT, ".cache")
 DECAY = 0.97          # pick value = 100 * DECAY ** (pick - 1)
 CLOSE = 10.0          # a "close" game is decided by fewer than this many points
@@ -19,11 +24,82 @@ NOT_INJURY = {"Coach's Decision", "Suspension", "Personal", "Not Injury Related"
 
 RULED_OUT = {"Out", "IR", "PUP"}   # Sleeper tags that count as a miss for a game not played yet (Questionable/Doubtful do not)
 
-# Long-term absences, from news reports (checked Oct 31, 2026). back = first date he is expected to be able to play:
+# Long-term absences, from news reports (checked Oct 31, 2026; re-checked Nov 2 for every player rostered in the four leagues). back = first date he is expected to be able to play:
 #   "season" = every remaining game; {"week": n} = first week he can play. A reported range of N weeks uses the
 #   midpoint, counted in weeks after the week he got hurt (so he misses Weeks inj+1 .. inj+N, minus byes).
 # Every row needs a source; no reported timeline -> no row (Sleeper's tag covers this week only).
 LONG_TERM = {
+    "9226": dict(back="season", injury="Torn ACL (Week 3, Sep 27)", timeline="Out for the 2026 season", basis="Season-ending",
+                 sources=["https://www.nfl.com/news/dolphins-rb-devon-achane-miss-2026-season-acl-tear",
+                          "https://www.cbssports.com/nfl/news/devon-achane-knee-injury-dolphins-chiefs-2026/"]),
+    "5927": dict(back="season", injury="Torn patellar tendon (Oct 19), surgery Oct 30", timeline="Out for the 2026 season", basis="Season-ending",
+                 sources=["https://www.nfl.com/news/commanders-wr-terry-mclaurin-out-rest-of-season-torn-patellar-tendon",
+                          "https://www.commanders.com/news/commanders-terry-mclaurin-injured-reserve-jer-zhan-newton"]),
+    "10222": dict(back="season", injury="Neck surgery (IR Sep 30)", timeline="Out for the 2026 season", basis="Season-ending",
+                  sources=["https://www.nfl.com/news/packers-wr-jayden-reed-to-undergo-neck-surgery-miss-rest-of-2026-season"]),
+    "12508": dict(back="season", injury="Knee surgery: meniscus, MCL/PCL (Sep 25)", timeline="4–6 months; out for the rest of the regular season", basis="Season-ending",
+                  sources=["https://www.giants.com/news/jaxson-dart-to-miss-rest-of-regular-season-jameis-winston-to-start-quarterback-injury-john-harbaugh",
+                           "https://giantswire.usatoday.com/story/sports/nfl/giants/2026/10/01/timeline-giants-jaxson-dart-return-revealed-surgery-went-well/92030077007/"]),
+    "6904": dict(back="season", injury="Blood clots in leg and lungs (IR Oct 17)", timeline="Likely out for the rest of 2026", basis="Season-ending",
+                 sources=["https://www.nfl.com/news/eagles-qb-jalen-hurts-out-2026-season-blood-clots",
+                          "https://www.philadelphiaeagles.com/news/eagles-place-jalen-hurts-on-injured-reserve-sign-rb-jaydon-blue-to-the-active-roster-2026-nfl-week-6-panthers"]),
+    "8205": dict(back={"week": 16}, injury="Back surgery (IR)", timeline="Lions hope for a late-December return", basis="Late December: back Week 16 (Dec 28)",
+                 sources=["https://sports.yahoo.com/articles/isiah-pacheco-injury-dan-campbell-172500189.html",
+                          "https://www.cbssports.com/fantasy/football/news/lions-isiah-pacheco-still-targeting-december-return/"]),
+    "2133": dict(back={"week": 15}, injury="Ruptured hamstring (Week 6, Oct 18), surgery Oct 28", timeline="6–10 weeks (McVay hopes for the short end)",
+                 basis="Midpoint 8 weeks after Week 6: misses Weeks 7–14",
+                 sources=["https://www.cbssports.com/fantasy/football/news/rams-davante-adams-undergoes-hamstring-surgery/",
+                          "https://www.nbcsports.com/fantasy/football/player-news/2026-10-28/mcvay-optimistic-on-adams-hammy-return-post-op"]),
+    "13417": dict(back={"week": 13}, injury="Ankle (Week 1), surgery Sep 16", timeline="About 10 weeks; team says on track for December", basis="Latest report: first December game, Week 13",
+                  sources=["https://www.espn.co.uk/nfl/story/_/id/49960208/49ers-dezhaun-stribling-surgery-miss-10-weeks",
+                           "https://www.cbssports.com/fantasy/football/news/49ers-dezhaun-stribling-remains-on-track-for-december-return/"]),
+    "11655": dict(back={"week": 13}, injury="Hamstring strain (Week 7), IR", timeline="IR; earliest return Week 13, not season-ending", basis="Earliest return",
+                  sources=["https://www.espn.com/nfl/story/_/id/50300226/giants-place-rb-tyrone-tracy-ir-hamstring-injury",
+                           "https://www.giants.com/news/tyrone-tracy-jr-injured-reserve-gregory-desrosiers-dean-lowry-practice-squad-roster-moves-bye-week-joe-schoen"]),
+    "8121": dict(back={"week": 12}, injury="Shoulder (IR Oct 19)", timeline="IR; earliest return Week 12 (after Week 11 bye), timeline uncertain", basis="Earliest return",
+                 sources=["https://apnews.com/article/romeo-doubs-patriots-injured-reserve-41773cdcbdf5fdd693667b3c8c5ac7ce",
+                          "https://www.fantasypros.com/nfl/news/614938/romeo-doubs-shoulder-facing-uncertain-timetable-to-retun.php"]),
+    "12533": dict(back={"week": 11}, injury="Groin (Week 5), IR Oct 19", timeline="IR; estimated return around Nov 23", basis="Nov 23 is his Week 11 game",
+                  sources=["https://www.espn.com/nfl/story/_/id/50221053",
+                           "https://www.nbcsports.com/fantasy/football/player-news/2026-10-19/commanders-place-croskey-merritt-groin-on-ir"]),
+    "11583": dict(back={"week": 10}, injury="Core muscle (Week 2), surgery Sep 23", timeline="6–8 weeks", basis="Midpoint 7 weeks after Week 2: misses Weeks 3–9",
+                  sources=["https://www.nfl.com/news/panthers-rb-jonathon-brooks-surgery-out-six-weeks",
+                           "https://www.cbssports.com/fantasy/football/news/panthers-jonathon-brooks-spotted-jogging-thursday/"]),
+    "11618": dict(back={"week": 11}, injury="Knee PCL sprain (Week 3, Sep 27), IR", timeline="6–8 weeks; no return date set as of Oct 29", basis="Midpoint 7 weeks after Week 3: misses Weeks 4–10",
+                  sources=["https://www.reuters.com/sports/reports-bucs-wr-jalen-mcmillan-knee-out-6-8-weeks--flm-2026-09-29/",
+                           "https://www.joebucsfan.com/2026/10/update-on-jalen-mcmillan/"]),
+    "9225": dict(back={"week": 11}, injury="Core muscle (Week 4, Oct 4), surgery", timeline="About six weeks or less", basis="6 weeks after Week 4: misses Weeks 5–10",
+                 sources=["https://www.cbssports.com/fantasy/football/news/eagles-tank-bigsby-placed-on-ir/",
+                          "https://www.philadelphiaeagles.com/news/eagles-place-rb-tank-bigsby-on-injured-reserve-release-lb-anfernee-orji-from-the-practice-squad"]),
+    "6819": dict(back={"week": 10}, injury="Plantar fasciitis (short-term IR Oct 10)", timeline="Earliest return Week 10; surgery not ruled out", basis="Earliest return",
+                 sources=["https://www.espn.com/nfl/story/_/id/50149634/steelers-placing-wr-pittman-injured-reserve",
+                          "https://www.nbcsports.com/nfl/profootballtalk/rumor-mill/news/steelers-wr-michael-pittman-headed-to-ir"]),
+    "12489": dict(back={"week": 13}, injury="Knee (practice, Week 8), short-term IR Oct 31", timeline="IR; eligible to return Week 13", basis="Earliest return",
+                  sources=["https://www.denverbroncos.com/news/broncos-promote-s-taylor-rapp-to-active-roster-place-rb-rj-harvey-on-injured-reserve",
+                           "https://www.nbcsports.com/nfl/profootballtalk/rumor-mill/news/broncos-will-put-running-back-r-j-harvey-on-injured-reserve-after-injury-in-practice"]),
+    "8142": dict(back={"week": 10}, injury="Re-aggravated heel (IR)", timeline="Still rehabbing; coach said he would \u201cmost likely not\u201d open his practice window in Week 8; no return date",
+                 basis="Not practicing yet: earliest realistic return Week 10",
+                 sources=["https://coltswire.usatoday.com/story/sports/nfl/colts/2026/10/26/alec-pierce-injury-news-steichen-provides-week-8-update/92453176007/",
+                          "https://www.nbcsports.com/nfl/profootballtalk/rumor-mill/news/alec-pierce-not-ready-to-return-to-practice-this-week"]),
+    "7543": dict(back={"week": 9}, injury="Hamstring (IR Oct 1)", timeline="IR; earliest return Week 9 (Week 8 bye), no firmer date", basis="Earliest return",
+                 sources=["https://apnews.com/article/saints-travis-etienne-injured-reserve-a19d20e13c1714fdfdeff81e1cb4dd5f",
+                          "https://www.profootballnetwork.com/travis-etienne-jr-injury-update-week-7-2026-saints-steelers-paris/"]),
+    "13281": dict(back={"week": 9}, injury="Hamstring (IR)", timeline="No return date; earliest Week 9 (Week 8 bye)", basis="Earliest return",
+                  sources=["https://www.usatoday.com/story/sports/nfl/saints/2026/10/25/jordyn-tyson-injury-update-return-saints/92354996007/"]),
+    "4881": dict(back={"week": 14}, injury="Right thumb (Week 8, Nov 1), surgery; IR", timeline="At least 4 games; earliest return Week 14 (Week 13 bye); could be season-ending",
+                 basis="Earliest return",
+                 sources=["https://www.usatoday.com/story/sports/nfl/ravens/2026/11/02/lamar-jackson-injury-update-thumb-return-timeline/92555873007/",
+                          "https://www.nfl.com/news/ravens-qb-lamar-jackson-suffers-right-thumb-injury-bills"]),
+    "12536": dict(back="season", injury="Turf toe (Week 7, Oct 25), IR Oct 28, surgery", timeline="Expected to miss the rest of the season", basis="Season-ending",
+                  sources=["https://www.houstonchronicle.com/sports/texans/article/jaylin-noel-turf-toe-22499362.php",
+                           "https://www.cbssports.com/fantasy/football/news/texans-jaylin-noel-needs-season-ending-surgery-on-toe/"]),
+    "4454": dict(back="season", injury="Fractured tibia (Week 8, Nov 1)", timeline="About three months; out for the season", basis="Season-ending",
+                 sources=["https://www.nbcsports.com/nfl/profootballtalk/rumor-mill/news/report-kendrick-bourne-has-a-fractured-tibia-will-miss-the-rest-of-the-season",
+                          "https://www.cbssports.com/fantasy/football/news/cardinals-kendrick-bourne-out-for-season/"]),
+}
+# Frozen copy of the injury list as checked on Oct 31 (used for leagues in leagues.FROZEN, i.e. Best League: its live
+# numbers were made with this list).
+LONG_TERM_OCT31 = {
     "9226": dict(back="season", injury="Torn ACL (Week 3, Sep 27)", timeline="Out for the 2026 season", basis="Season-ending",
                  sources=["https://www.nfl.com/news/dolphins-rb-devon-achane-miss-2026-season-acl-tear",
                           "https://www.cbssports.com/nfl/news/devon-achane-knee-injury-dolphins-chiefs-2026/"]),
@@ -82,15 +158,34 @@ LONG_TERM = {
                   sources=["https://www.usatoday.com/story/sports/nfl/saints/2026/10/25/jordyn-tyson-injury-update-return-saints/92354996007/"]),
 }
 
+# Players back from IR whose Sleeper tag has not caught up yet (their tag is ignored).
+ACTIVATED = {"13286": "Activated from IR Nov 2, plays Week 8 (https://www.seahawks.com/news/seahawks-activate-rb-jadarian-price-from-injured-reserve)"}
+
+
+def frozen(key):
+    return (LG.FROZEN.get(key) or {}).get("injuries") == "oct31"
+
+
+def long_term(key):
+    """The injury list a league uses (frozen leagues keep the Oct 31 list)."""
+    return LONG_TERM_OCT31 if frozen(key) else LONG_TERM
+
+
+def ruled_out(pid, tag, key=None):
+    return tag in RULED_OUT and (frozen(key) or pid not in ACTIVATED)
+
 
 def get(path):
     return S.get_json(S.SLEEPER + path)
 
 
-def main():
+def main(lg, last_arg=None):
+    LEAGUE, KEY = lg["id"], lg["key"]
+    OUT = out_path(KEY, "podcast")
+    LT = long_term(KEY)
     L = get("/v1/league/%s" % LEAGUE)
     season = L["season"]
-    last = int(sys.argv[1]) if len(sys.argv) > 1 else int(L["settings"].get("last_scored_leg") or 0)
+    last = int(last_arg) if last_arg else int(L["settings"].get("last_scored_leg") or 0)
     if last < 1:
         raise SystemExit("no completed weeks yet")
     weeks = list(range(1, last + 1))
@@ -159,7 +254,7 @@ def main():
         pos = q.get("position") or md.get("position")
         tag = q.get("injury_status")
         part = q.get("injury_body_part")
-        lt = LONG_TERM.get(pid)
+        lt = LT.get(pid)
         missed, coming, gp, pts = [], [], 0, 0.0
         # NFL team by week; a week with no stats row uses the nearest week that has one (players traded between NFL teams)
         seen = {w: stats[w][pid]["team"] for w in weeks + [cur] if (stats[w].get(pid) or {}).get("team")}
@@ -178,7 +273,7 @@ def main():
                         pts += fpts(st)
                 else:
                     missed.append(w)
-            elif w == cur and (tag in RULED_OUT or (lt and w < back_week(lt))):
+            elif w == cur and (ruled_out(pid, tag, KEY) or (lt and w < back_week(lt))):
                 coming.append(w)   # this week's game not played yet and he is already ruled out
         nfl = q.get("team")
         if lt and nfl:
@@ -335,13 +430,15 @@ def main():
         r["rank"] = i + 1
     close = sorted(games, key=lambda g: abs(g["pa"] - g["pb"]))[:6]
     now = datetime.datetime.now(datetime.timezone.utc)
-    data = dict(season=season, weeks=[weeks[0], weeks[-1]], league=L["name"], asof=now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    data = dict(key=KEY, title=lg["name"], season=season, weeks=[weeks[0], weeks[-1]], league=L["name"], asof=now.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 close_margin=CLOSE, decay=DECAY, cur=cur, end=end, teams=rows, players=players, trades=trades, close=close, games=games)
     with open(OUT, "w") as f:
         f.write("/* Static snapshot generated by tools/podcast.py. The update workflow does not touch this file. */\n")
-        f.write("window.PODCAST=window.PODCAST||{};\nwindow.PODCAST.best=" + json.dumps(data, separators=(",", ":"), ensure_ascii=False) + ";\n")
+        f.write("window.PODCAST=window.PODCAST||{};\nwindow.PODCAST[%s]=" % json.dumps(KEY) + json.dumps(data, separators=(",", ":"), ensure_ascii=False) + ";\n")
     S.log("wrote %s (weeks %d-%d, %d teams, %d players with misses)" % (OUT, weeks[0], weeks[-1], len(rows), len(players)))
 
 
 if __name__ == "__main__":
-    main()
+    args = sys.argv[1:]
+    for lg in LG.pick(args):
+        main(lg, args[0] if args else None)

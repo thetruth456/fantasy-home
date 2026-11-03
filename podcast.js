@@ -1,4 +1,4 @@
-/* Best League "Podcast" luck report. Static snapshot from best-podcast-data.js (tools/podcast.py).
+/* "Podcast" luck report, one league per data file (<key>-podcast-data.js, tools/podcast.py --league KEY).
    Independent of report-core.js / refresh.js: the update workflow and "Refresh everything" never touch it. */
 (function(){
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]})}
@@ -24,8 +24,8 @@ function who(t){return '<b>'+esc(t.name)+'</b> <span class="mgr">'+esc(t.user)+'
 function gms(n){return n+' game'+(n===1?'':'s')}
 var wk=D.weeks[0]===D.weeks[1]?"Week "+D.weeks[0]:"Weeks "+D.weeks[0]+"\u2013"+D.weeks[1];
 var h=[];
-h.push('<h1>Best League luck report: '+wk+'</h1>');
-h.push('<p class="asof">Snapshot as of '+esc(ptTime(D.asof))+'. Not changed by the hourly update or Refresh everything.</p>');
+h.push('<h1>'+esc(D.title||"Best League")+' luck report: '+wk+'</h1>');
+h.push('<p class="asof">Snapshot as of '+esc(ptTime(D.asof))+'.'+(window.PODCAST_STANDALONE?'':' Not changed by the hourly update or Refresh everything.')+'</p>');
 
 /* ---- headlines */
 var lucky=T[0],unlucky=T[T.length-1];
@@ -43,7 +43,7 @@ h.push('</ul></section>');
 
 /* ---- luck index table */
 var li=tiers(T.map(function(t){return t.idx}),true),lw=tiers(T.map(function(t){return t.luck}),true),lb=tiers(T.map(function(t){return t.inj_bill}),false),lm=tiers(T.map(function(t){return t.bye_gain||0}),true);
-h.push('<section><h2>Luck index</h2><p class="cap">Luck index = the average of two z-scores: wins above expected (actual wins minus all-play expected wins) and the injury bill (reversed, so fewer injuries is luckier). Positive is lucky; green to red is relative to the 12 teams. Bye Week Merchant (not in the luck index) = points your opponents lost because their players were on bye the week they played you; \u201c(1 win)\u201d = you won by less than that.</p><div class="scroll"><table><thead><tr><th>Rank</th><th>Team</th><th>Manager</th><th>Record</th><th>Expected wins</th><th>Wins above expected</th><th>All-play</th><th>Luck index</th><th>Points for</th><th>Points against</th><th>Injury bill</th><th>Bye Week Merchant</th></tr></thead><tbody>');
+h.push('<section><h2>Luck index</h2><p class="cap">Luck index = the average of two z-scores: wins above expected (actual wins minus all-play expected wins) and the injury bill (reversed, so fewer injuries is luckier). Positive is lucky; green to red is relative to the '+T.length+' teams. Bye Week Merchant (not in the luck index) = points your opponents lost because their players were on bye the week they played you; \u201c(1 win)\u201d = you won by less than that.</p><div class="scroll"><table><thead><tr><th>Rank</th><th>Team</th><th>Manager</th><th>Record</th><th>Expected wins</th><th>Wins above expected</th><th>All-play</th><th>Luck index</th><th>Points for</th><th>Points against</th><th>Injury bill</th><th>Bye Week Merchant</th></tr></thead><tbody>');
 T.forEach(function(t,i){h.push('<tr><td>'+t.rank+'</td><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+f1(t.xw)+'</td><td>'+pill(sg(t.luck,1),lw[i])+'</td><td>'+rec(t.apw,t.apl,t.apt)+'</td><td>'+pill(sg(t.idx,2),li[i])+'</td><td>'+f1(t.pf)+'</td><td>'+f1(t.pa)+'</td><td>'+pill(f1(t.inj_bill),lb[i])+'</td><td>'+(t.bye_gain==null?'\u2014':pill('+'+f1(t.bye_gain),lm[i])+(t.bye_wins?' <span class="inj">('+t.bye_wins+' win'+(t.bye_wins>1?'s':'')+')</span>':''))+'</td></tr>')});
 h.push('</tbody></table></div></section>');
 
@@ -97,7 +97,7 @@ h.push('</div></section>');
 
 /* ---- methodology */
 h.push('<section><h2>Methodology</h2><ul class="meth">'+
-'<li><b>Expected wins:</b> each week, the share of the other 11 teams a team outscored, summed. Records and scores: '+wk.toLowerCase()+'.</li>'+
+'<li><b>Expected wins:</b> each week, the share of the other '+(T.length-1)+' teams a team outscored, summed. Records and scores: '+wk.toLowerCase()+'.</li>'+
 '<li><b>Games lost:</b> a drafted player\u2019s NFL team played and he didn\u2019t (byes and a coach\u2019s decision excluded). Week '+D.cur+': Out/IR/PUP players count. Future: reported timelines through week '+D.end+' (season-ending = every game; ranges use the midpoint, counted from the injury week).</li>'+
 '<li><b>Bye Week Merchant:</b> points your opponents lost because their players were on bye the week they played you (their best lineup with vs without bye players, using season averages), summed over the season. \u201c(1 win)\u201d = you won by less than that.</li>'+
 '<li><b>Who pays:</b> the team holding the player that week (last holder if he was dropped). Pick value comes from the original draft pick.</li>'+
@@ -105,25 +105,29 @@ h.push('<section><h2>Methodology</h2><ul class="meth">'+
 return h.join("");
 }
 
+window.buildPodcast=build;
+/* Sub-tabs of one league: Power Rankings (default), Luck report, Weekly report (password-locked by lock.js).
+   opt.hashes: canonical hash per view {power,podcast,report}; opt.alias: extra hashes -> view (old links);
+   opt.initial: starting view (else from the hash, else power); opt.listen: follow hashchange (standalone pages). */
 window.initPodcast=function(key,opt){opt=opt||{};
 var D=window.PODCAST&&window.PODCAST[key],box=document.getElementById(key+"-podcast");
-if(box)box.innerHTML=D?build(D):'<p class="cap">Podcast data is missing.</p>';
+if(box)box.innerHTML=D?build(D):'<p class="cap">Luck report data is missing.</p>';
 var PD=window.POWER&&window.POWER[key],pbox=document.getElementById(key+"-power");
 if(pbox)pbox.innerHTML=PD&&window.buildPower?window.buildPower(PD):'<p class="cap">Power rankings data is missing.</p>';
-var H=opt.hashes||{podcast:opt.podHash};
+var H=opt.hashes||{},AL=opt.alias||{};
 /* compact playoff-odds chart at the top of the weekly report (same data as the Power Rankings tab) */
 var rc=document.getElementById(key+"-repchart");
 if(rc){rc.innerHTML=PD&&window.buildPowerOdds?window.buildPowerOdds(PD,{compact:true,link:H.power}):"";rc.hidden=!rc.innerHTML}
 var btns=document.querySelectorAll('#'+key+'-subtabs button'),V=[];
 for(var i=0;i<btns.length;i++)V.push(btns[i].getAttribute("data-v"));
-function set(v,push){if(V.indexOf(v)<0)v="report";
+function set(v,push){if(V.indexOf(v)<0)v=V[0];
 for(var j=0;j<V.length;j++){var el=document.getElementById(key+"-view-"+V[j]);if(el)el.hidden=V[j]!==v}
 for(var i=0;i<btns.length;i++)btns[i].setAttribute("aria-selected",btns[i].getAttribute("data-v")===v);
-if(push&&history.replaceState)history.replaceState(null,"",v==="report"?opt.repHash:H[v])}
-function fromHash(){for(var k in H)if(location.hash===H[k])return k;return "report"}
+if(push&&H[v]&&history.replaceState)history.replaceState(null,"",H[v]);
+if(push&&v==="report"&&document.body.classList.contains("rlocked")){var pw=document.querySelector("#"+key+"-view-report .lock-pw");if(pw)try{pw.focus({preventScroll:true})}catch(e){}}}
+function fromHash(){var h=location.hash;for(var k in H)if(h===H[k])return k;return AL[h]||null}
 for(var i=0;i<btns.length;i++)btns[i].onclick=function(){set(this.getAttribute("data-v"),true);window.scrollTo(0,Math.min(window.scrollY,(document.getElementById(key+"-subtabs").getBoundingClientRect().top+window.scrollY)-80))};
 window["set_"+key+"_view"]=function(v){set(v,false)};
-set(opt.initial||"report",false);
-if(opt.listen)window.addEventListener("hashchange",function(){set(fromHash(),false)})};
-window.podcastViewFromHash=function(hashes){for(var k in hashes)if(location.hash===hashes[k])return k;return "report"};
+set(opt.initial||fromHash()||V[0],false);
+if(opt.listen)window.addEventListener("hashchange",function(){set(fromHash()||V[0],false)})};
 })();

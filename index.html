@@ -12,8 +12,10 @@
 <header class="site"><div class="in"><a class="brand" href="index.html"><img src="favicon.svg" alt="" width="30" height="30"><span>Fantasy <b>home base</b></span></a><nav class="tabs" role="tablist" aria-label="Leagues"><button type="button" role="tab" data-p="best" class="theme-best" data-theme="theme-best" aria-selected="true" aria-controls="p-best">Best League</button><button type="button" role="tab" data-p="zbt" class="theme-zbt" data-theme="theme-zbt" aria-selected="false" aria-controls="p-zbt">ZBT</button><button type="button" role="tab" data-p="oops" class="theme-oops" data-theme="theme-oops" aria-selected="false" aria-controls="p-oops">Oopsilons</button><button type="button" role="tab" data-p="spacex" class="theme-spacex" data-theme="theme-spacex" aria-selected="false" aria-controls="p-spacex">SpaceX FF</button></nav><div class="refresh"><div class="rbtns"><button type="button" id="full-btn" class="refresh-btn full" title="Re-pulls everything (rosters, projections, props, FantasyPros) through GitHub Actions"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3v9m0 0 3.5-3.5M12 12 8.5 8.5M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lbl">Refresh everything</span></button></div><span id="refresh-status" class="refresh-status" role="status" aria-live="polite">Updates automatically: hourly Sat 1 PM to Sun 10 AM PT, daily otherwise</span><button type="button" id="token-clear" class="linkbtn" hidden>Forget GitHub token</button><button type="button" id="lock-btn" class="linkbtn" hidden title="Lock the reports and forget this device">Lock</button></div></div><div id="token-panel" class="token-panel" hidden><div class="tin"><strong>One-time setup for “Refresh everything”</strong><ol><li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub: new fine-grained token</a>, name it anything and pick an expiry.</li><li>Repository access: <b>Only select repositories</b>, then <b>fantasy-home</b>.</li><li>Permissions, Repository permissions: <b>Actions: Read and write</b>. Nothing else. Click Generate token.</li><li>Paste the token below. It is saved only in this browser (localStorage), never in the repo.</li></ol><form id="token-form" autocomplete="off"><input type="password" id="token-input" placeholder="github_pat_…" aria-label="GitHub token" autocomplete="off" spellcheck="false"><button type="submit" class="refresh-btn">Save and refresh</button><button type="button" id="token-cancel" class="linkbtn">Cancel</button></form><p id="token-msg" class="token-msg" role="alert"></p></div></div></header>
 <div class="wrap">
 <div class="panel theme-best" id="p-best" role="tabpanel">
-<div class="subtabs" id="best-subtabs" role="tablist" aria-label="Best League views"><button type="button" role="tab" data-v="report" aria-selected="true">Weekly report</button><button type="button" role="tab" data-v="podcast" aria-selected="false">Podcast: luck report</button><button type="button" role="tab" data-v="power" aria-selected="false">Podcast: Power Rankings</button></div>
-<div class="view rep" id="best-view-report">
+<div class="subtabs" id="best-subtabs" role="tablist" aria-label="Best League views"><button type="button" role="tab" data-v="power" aria-selected="true">Power Rankings</button><button type="button" role="tab" data-v="podcast" aria-selected="false">Luck report</button><button type="button" role="tab" data-v="report" aria-selected="false">Weekly report</button></div>
+<div class="view" id="best-view-power"><div id="best-power"></div></div>
+<div class="view" id="best-view-podcast" hidden><div id="best-podcast"></div></div>
+<div class="view rep" id="best-view-report" hidden>
 <div class="lock"><noscript><p class="lockcard">The weekly report needs JavaScript to unlock.</p></noscript></div>
 <p class="weekline">Weekly snapshots: <a href="best-league.html" id="best-week">Latest week</a> <span class="sep">|</span> <a href="best-league.html">Standalone page</a></p>
 <h1 id="best-title"></h1>
@@ -49,13 +51,17 @@
 <section id="best-data-notes"><h2>Data notes and sources</h2>
 <ul id="best-notes"></ul></section>
 </div>
-<div class="view" id="best-view-podcast" hidden><div id="best-podcast"></div></div>
-<div class="view" id="best-view-power" hidden><div id="best-power"></div></div></div>
-<div class="panel rep theme-zbt" id="p-zbt" role="tabpanel" hidden>
+</div>
+<div class="panel theme-zbt" id="p-zbt" role="tabpanel" hidden>
+<div class="subtabs" id="zbt-subtabs" role="tablist" aria-label="ZBT views"><button type="button" role="tab" data-v="power" aria-selected="true">Power Rankings</button><button type="button" role="tab" data-v="podcast" aria-selected="false">Luck report</button><button type="button" role="tab" data-v="report" aria-selected="false">Weekly report</button></div>
+<div class="view" id="zbt-view-power"><div id="zbt-power"></div></div>
+<div class="view" id="zbt-view-podcast" hidden><div id="zbt-podcast"></div></div>
+<div class="view rep" id="zbt-view-report" hidden>
 <div class="lock"><noscript><p class="lockcard">The weekly report needs JavaScript to unlock.</p></noscript></div>
 <p class="weekline">Weekly snapshots: <a href="zbt.html" id="zbt-week">Latest week</a> <span class="sep">|</span> <a href="zbt.html">Standalone page</a></p>
 <h1 id="zbt-title"></h1>
 <p class="asof" id="zbt-asof"></p>
+<div class="repchart" id="zbt-repchart" hidden></div>
 
 <section class="quick"><h2>Quick read (suggestion only)</h2>
 <ul id="zbt-quick"></ul></section>
@@ -84,12 +90,18 @@
 <dl id="zbt-setup"></dl></section>
 
 <section id="zbt-data-notes"><h2>Data notes and sources</h2>
-<ul id="zbt-notes"></ul></section></div>
-<div class="panel rep theme-oops" id="p-oops" role="tabpanel" hidden>
+<ul id="zbt-notes"></ul></section>
+</div></div>
+<div class="panel theme-oops" id="p-oops" role="tabpanel" hidden>
+<div class="subtabs" id="oops-subtabs" role="tablist" aria-label="Oopsilons views"><button type="button" role="tab" data-v="power" aria-selected="true">Power Rankings</button><button type="button" role="tab" data-v="podcast" aria-selected="false">Luck report</button><button type="button" role="tab" data-v="report" aria-selected="false">Weekly report</button></div>
+<div class="view" id="oops-view-power"><div id="oops-power"></div></div>
+<div class="view" id="oops-view-podcast" hidden><div id="oops-podcast"></div></div>
+<div class="view rep" id="oops-view-report" hidden>
 <div class="lock"><noscript><p class="lockcard">The weekly report needs JavaScript to unlock.</p></noscript></div>
 <p class="weekline">Weekly snapshots: <a href="oopsilons.html" id="oops-week">Latest week</a> <span class="sep">|</span> <a href="oopsilons.html">Standalone page</a></p>
 <h1 id="oops-title"></h1>
 <p class="asof" id="oops-asof"></p>
+<div class="repchart" id="oops-repchart" hidden></div>
 
 <section class="quick"><h2>Quick read (suggestion only)</h2>
 <ul id="oops-quick"></ul></section>
@@ -118,12 +130,18 @@
 <dl id="oops-setup"></dl></section>
 
 <section id="oops-data-notes"><h2>Data notes and sources</h2>
-<ul id="oops-notes"></ul></section></div>
-<div class="panel rep theme-spacex" id="p-spacex" role="tabpanel" hidden>
+<ul id="oops-notes"></ul></section>
+</div></div>
+<div class="panel theme-spacex" id="p-spacex" role="tabpanel" hidden>
+<div class="subtabs" id="spacex-subtabs" role="tablist" aria-label="SpaceX FF views"><button type="button" role="tab" data-v="power" aria-selected="true">Power Rankings</button><button type="button" role="tab" data-v="podcast" aria-selected="false">Luck report</button><button type="button" role="tab" data-v="report" aria-selected="false">Weekly report</button></div>
+<div class="view" id="spacex-view-power"><div id="spacex-power"></div></div>
+<div class="view" id="spacex-view-podcast" hidden><div id="spacex-podcast"></div></div>
+<div class="view rep" id="spacex-view-report" hidden>
 <div class="lock"><noscript><p class="lockcard">The weekly report needs JavaScript to unlock.</p></noscript></div>
 <p class="weekline">Weekly snapshots: <a href="spacex-ff.html" id="spacex-week">Latest week</a> <span class="sep">|</span> <a href="spacex-ff.html">Standalone page</a></p>
 <h1 id="spacex-title"></h1>
 <p class="asof" id="spacex-asof"></p>
+<div class="repchart" id="spacex-repchart" hidden></div>
 
 <section class="quick"><h2>Quick read (suggestion only)</h2>
 <ul id="spacex-quick"></ul></section>
@@ -152,7 +170,8 @@
 <dl id="spacex-setup"></dl></section>
 
 <section id="spacex-data-notes"><h2>Data notes and sources</h2>
-<ul id="spacex-notes"></ul></section></div>
+<ul id="spacex-notes"></ul></section>
+</div></div>
 </div>
 <footer>Sleeper username: kfelder30</footer>
 <script src="lock.js"></script>
@@ -163,25 +182,36 @@
 <script src="oopsilons-report.js"></script>
 <script src="spacex-report.js"></script>
 <script src="best-podcast-data.js"></script>
-<script src="podcast.js"></script>
 <script src="best-power-data.js"></script>
+<script src="zbt-podcast-data.js"></script>
+<script src="zbt-power-data.js"></script>
+<script src="oops-podcast-data.js"></script>
+<script src="oops-power-data.js"></script>
+<script src="spacex-podcast-data.js"></script>
+<script src="spacex-power-data.js"></script>
+<script src="podcast.js"></script>
 <script src="power.js"></script>
 <script>
 (function(){
-var ids=["best","zbt","oops","spacex"];
+/* League tabs, each with sub-tabs Power Rankings (default), Luck report, Weekly report. Hashes: #<league> = Power Rankings,
+   #<league>-luck, #<league>-report; old links #<league>-power and #<league>-podcast still work. */
+var ids=["best","zbt","oops","spacex"],SUF={"":"power",power:"power",luck:"podcast",podcast:"podcast",report:"report"},CAN={power:"",podcast:"-luck",report:"-report"};
+ids.forEach(function(k){initPodcast(k,{hashes:{power:"#"+k,podcast:"#"+k+"-luck",report:"#"+k+"-report"},initial:"power"})});
 fhLock(function(){ids.forEach(function(k){initReport(k)})});
-initPodcast("best",{hashes:{podcast:"#best-podcast",power:"#best-power"},repHash:"#best"});
 var tabs=document.querySelectorAll(".tabs button");
-function show(id){var sub="report";if(id==="best-podcast"||id==="best-power"){sub=id.slice(5);id="best"}if(ids.indexOf(id)<0)id="best";
+function parse(h){var m=/^([a-z]+)(?:-([a-z]+))?$/.exec(h||"");if(!m||ids.indexOf(m[1])<0||!((m[2]||"") in SUF))return {id:"best",sub:"power"};
+return {id:m[1],sub:SUF[m[2]||""]||"power"}}
+function show(id,sub){
 for(var i=0;i<ids.length;i++){document.getElementById("p-"+ids[i]).hidden=ids[i]!==id}
 var th="theme-best";
 for(var j=0;j<tabs.length;j++){var on=tabs[j].getAttribute("data-p")===id;tabs[j].setAttribute("aria-selected",on);if(on)th=tabs[j].getAttribute("data-theme")}
 document.body.className=th+(document.body.classList.contains("rlocked")?" rlocked":"");
-if(id==="best"&&window.set_best_view)set_best_view(sub);
-if(history.replaceState)history.replaceState(null,"","#"+(id==="best"&&sub!=="report"?"best-"+sub:id))}
-for(var k=0;k<tabs.length;k++){tabs[k].onclick=function(){show(this.getAttribute("data-p"))}}
-window.addEventListener("hashchange",function(){show(location.hash.replace("#",""))});
-show(location.hash.replace("#",""));
+if(window["set_"+id+"_view"])window["set_"+id+"_view"](sub);
+if(history.replaceState)history.replaceState(null,"","#"+id+CAN[sub])}
+function fromHash(){var p=parse(location.hash.replace("#",""));show(p.id,p.sub)}
+for(var k=0;k<tabs.length;k++){tabs[k].onclick=function(){show(this.getAttribute("data-p"),"power")}}
+window.addEventListener("hashchange",fromHash);
+fromHash();
 })();
 </script>
 </body></html>

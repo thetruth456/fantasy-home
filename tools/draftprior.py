@@ -9,7 +9,12 @@ assumed to be worth the same for everyone before the draft.
 import statistics as st
 import sources as S
 
-REPL = {"QB": 13, "RB": 30, "WR": 30, "TE": 13, "K": 13, "DEF": 13}   # replacement level = Nth best at the position
+REPL = {"QB": 13, "RB": 30, "WR": 30, "TE": 13, "K": 13, "DEF": 13}   # replacement level = Nth best at the position (12 teams)
+
+
+def repl(nteams):
+    """Replacement ranks scaled to league size (12 teams -> REPL)."""
+    return {q: int(round(n * nteams / 12.0)) for q, n in REPL.items()}
 
 
 def season_projections(season):
@@ -25,23 +30,24 @@ def rosters(P, picks):
     return out
 
 
-def player_values(proj, fpts):
+def player_values(proj, fpts, adp="adp_half_ppr"):
     P = {}
     for e in proj:
         pid, s = e.get("player_id"), e.get("stats") or {}
         if not pid:
             continue
         pl = e.get("player") or {}
-        P[pid] = dict(v=max(0.0, fpts(s)) / 17.0, pos=e.get("position") or pl.get("position") or "", adp=s.get("adp_half_ppr") or 999,
+        P[pid] = dict(v=max(0.0, fpts(s)) / 17.0, pos=e.get("position") or pl.get("position") or "", adp=s.get(adp) or 999,
                       name=("%s %s" % (pl.get("first_name", ""), pl.get("last_name", ""))).strip())
     return P
 
 
-def values(proj, picks, slots, fpts, lineup):
-    """(post-draft value - league mean, keeper surplus - league mean, keepers) by roster_id; also see rosters()."""
-    P = player_values(proj, fpts)
+def values(proj, picks, slots, fpts, lineup, adp="adp_half_ppr", nteams=12):
+    """(post-draft value - league mean, keeper surplus - league mean, keepers) by roster_id; also see rosters().
+    adp: the Sleeper ADP field matching the league's scoring; nteams scales the replacement ranks."""
+    P = player_values(proj, fpts, adp)
     rep = {}
-    for q, n in REPL.items():
+    for q, n in repl(nteams).items():
         vs = sorted((p["v"] for p in P.values() if p["pos"] == q), reverse=True)
         rep[q] = vs[n - 1] if len(vs) >= n else 0.0
     for p in P.values():
