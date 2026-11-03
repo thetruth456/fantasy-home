@@ -53,7 +53,12 @@ jobs:
         env:
           # workflow_dispatch passes the boolean as "true"/"false"; scheduled runs have no input and are gated
           FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force || 'false' }}
+          # data files are written encrypted with this password (tools/seal.py); missing or wrong -> the run fails, nothing is written
+          FH_REPORT_PASSWORD: ${{ secrets.FH_REPORT_PASSWORD }}
         run: python tools/update.py
+
+      - name: Refuse to commit unencrypted data
+        run: python tools/seal.py verify
 
       - name: Commit and push if data changed
         id: commit

@@ -42,7 +42,9 @@ else if(r.status===422){e.message="GitHub couldn\u2019t start the workflow. Chec
 else e.message="GitHub returned HTTP "+r.status+".";
 return e}
 function ok(r,what){return r.ok?r:Promise.reject(ghError(r,what))}
-function parseData(text,key){var i=text.indexOf("{",text.indexOf("REPORTS."+key+"="));if(i<0)throw new Error("unexpected data file");return JSON.parse(text.slice(i,text.lastIndexOf("}")+1))}
+function parseData(text,key){/* data files are encrypted (tools/seal.py); lock.js holds the unlocked key */
+if(text.indexOf("window.LOCKED")>=0)return window.fhUnseal(text);
+var i=text.indexOf("{",text.indexOf("REPORTS."+key+"="));if(i<0)throw new Error("unexpected data file");return JSON.parse(text.slice(i,text.lastIndexOf("}")+1))}
 function loadData(key){/* repo contents API first (fresh, no Pages deploy lag), then the site's own copy */
 var f=FILES[key];
 return gh("/repos/"+REPO+"/contents/"+f+"?ref="+REF,{accept:"application/vnd.github.raw+json"}).then(function(r){if(!r.ok)throw 0;return r.text()})

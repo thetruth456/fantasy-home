@@ -71,10 +71,21 @@ Requires Python 3.9+ (`pip install -r tools/requirements.txt` gives zoneinfo dat
 
 Power rankings work the same way: `python tools/power.py [sims]` writes `best-power-data.js` (rendered by `power.js`). Each current-roster player is valued at his own season points per game, weighted gp/(gp+7), plus his Sleeper projection that week for the rest (zero on byes, this week's Out/IR tags and `LONG_TERM` absences from `tools/podcast.py`); a team's weekly mean is its best legal lineup. It simulates the rest of the regular season and Sleeper's fixed playoff bracket (10,000 runs by default, fixed seed), plus a random-opponent run for the schedule effect. Each run also draws a persistent team-strength offset with sd 1/sqrt(1/TAU0^2 + weeks/22.9^2); `FH_POWER_TAU0` (default 4.6 pts/wk) sets the preseason size. Future injuries are simulated (`tools/injury.py`): per-game absence rates by position and how many games an absence lasts, measured from Sleeper game logs 2021–25 (`python tools/injury.py` reproduces them). Each team gets 2,000 injury paths (`FH_POWER_PATHS`). When starters are out, the best lineup re-forms from the bench plus waiver fill-ins (the 3rd/4th-best unrostered player at each position). Team means are the injury-path averages, and each simulated season follows one path. Weekly noise drops to sqrt(sd^2 - injury week-to-week variance) so the total spread still matches real scores. Team edges over the league mean are scaled by beta_t = 1 - (1 - 0.51)*7.6/(7.6 + t) after week t (0.51 preseason). The preseason prior (`tools/draftprior.py`) is the injury-averaged best lineup of drafted players at Sleeper preseason projections. The "Pre-draft" point uses only keeper surplus x 0.95 (keeper value over replacement minus that of players with ADP near his pick), with extra uncertainty for the draft and the unknown rosters' injuries. All constants come from Best League 2022–25 via `python tools/power_calibrate.py` (prints the injury and no-injury versions; writes nothing).
 
+## Password lock (encrypted data)
+
+The weekly reports and the Best League podcast tabs are behind a password. Every data file (`*-report.js`, `best-podcast-data.js`, `best-power-data.js`) holds only ciphertext; `lock.js` asks for the password and decrypts in the browser (WebCrypto).
+
+* Crypto (`tools/seal.py`): password -> PBKDF2-SHA256 (600,000 iterations, public salt in `tools/lock.json`) -> master key; each file and each write gets a fresh random salt (HKDF-SHA256 -> AES-256-GCM key) and a fresh random IV. `tools/lock.json` also holds an encrypted check value, so a wrong password fails the build instead of writing files nobody can open.
+* The password is read from env `FH_REPORT_PASSWORD` (the Action uses the repository secret of the same name). Without it, `tools/update.py`, `tools/podcast.py` and `tools/power.py` exit with an error and write nothing. The workflow also runs `python tools/seal.py verify` before committing.
+* "Remember on this device" stores the derived master key (not the password) in localStorage; the **Lock** link in the header forgets it.
+* Change the password: `FH_REPORT_PASSWORD_OLD=<old> FH_REPORT_PASSWORD=<new> python tools/seal.py init`, commit `tools/lock.json` and the data files, and update the secret.
+* `python tools/seal.py check` confirms the password and that every data file decrypts. Needs `pip install cryptography`.
+* Git history from before the lock still has plaintext data files.
+
 ## Pages and files
 
 * `index.html`: tabbed home, one tab per league. Standalone pages: `best-league.html`, `zbt.html`, `oopsilons.html`, `spacex-ff.html`.
-* `style.css`, `report-core.js` (renders the tables and text), `refresh.js` (both buttons).
+* `style.css`, `lock.js` (password gate and decryption), `report-core.js` (renders the tables and text), `refresh.js` (Refresh everything).
 * `*-report.js`: generated data files. Do not edit by hand; changes are overwritten by the next run.
 * `tools/`: `update.py` (orchestration and gate), `sources.py` (Sleeper, Fieldwork, FantasyPros, ESPN fetchers), `build.py` (scoring, props, ranks, waiver list, text), `overrides.json`.
 * `.github/workflows/update.yml`: the schedule.

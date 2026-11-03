@@ -1,0 +1,16 @@
+{
+ "_doc": "Public PBKDF2 salt and an encrypted check value for tools/seal.py. Holds no secret.",
+ "v": 1,
+ "iter": 600000,
+ "ks": "T1V7BmE4r3zpvsqJFzUGUA==",
+ "check": {
+  "v": 1,
+  "kdf": "PBKDF2-SHA256+HKDF",
+  "alg": "AES-256-GCM",
+  "iter": 600000,
+  "ks": "T1V7BmE4r3zpvsqJFzUGUA==",
+  "salt": "Bxw5lTbhIABx6xZCebf2dg==",
+  "iv": "pbN/vqZCnhFNB0X2",
+  "ct": "X3SCbjA/dIIso2zOFkoFfQ2WjZjQhCg="
+ }
+}

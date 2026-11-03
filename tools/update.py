@@ -8,6 +8,7 @@ Environment:
   FH_NOW=<iso>     pretend it is this UTC time (testing the gate)
   FH_OUT_DIR=<dir> write the data files here instead of the repo root (testing)
   FH_CACHE_DIR     where the Sleeper players dump is cached (default <repo>/.cache)
+  FH_REPORT_PASSWORD  required: data files are written encrypted (tools/seal.py); without it nothing is written
 """
 import datetime as dt
 import json
@@ -18,6 +19,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build  # noqa: E402
+import seal  # noqa: E402
 import sources as S  # noqa: E402
 from sources import log  # noqa: E402
 
@@ -53,20 +55,16 @@ def should_run(now_pt, force):
 
 
 # ------------------------------------------------------------------ data file io
-def read_data(path):
-    try:
-        t = open(path, encoding="utf-8").read()
-        return json.loads(t[t.index("{", t.index("window.REPORTS.")): t.rindex("}") + 1])
-    except Exception:  # noqa: BLE001
-        return None
+def read_data(path, key, K):
+    return seal.read(path, "REPORTS." + key, K)
 
 
-def write_data(path, key, d):
-    parts = ['"META":' + json.dumps(d["META"], ensure_ascii=False, separators=(",", ":"))]
+def write_data(path, key, d, K):
+    """Always encrypted (tools/seal.py); there is no plaintext path."""
+    obj = {"META": d["META"]}
     for g in ("STARTERS", "BENCH", "WAIVER", "DEFENSE"):
-        parts.append('"%s":%s' % (g, json.dumps(d[g], ensure_ascii=False)))
-    js = "window.REPORTS=window.REPORTS||{};\nwindow.REPORTS.%s={\n%s\n};\n" % (key, ",\n".join(parts))
-    open(path, "w", encoding="utf-8").write(js)
+        obj[g] = d[g]
+    K.write(path, "REPORTS." + key, obj)
 
 
 def canon(d):
@@ -91,6 +89,11 @@ def main():
     log("Now %s UTC = %s PT (%s). Run? %s: %s" % (now.strftime("%Y-%m-%d %H:%M"), now_pt.strftime("%a %Y-%m-%d %H:%M %Z"), "forced" if force else "gated", "YES" if ok else "NO", why))
     if not ok:
         return 0
+    try:  # fail closed: no password (or the wrong one) -> write nothing
+        K = seal.Key()
+    except seal.SealError as e:
+        log("ERROR: %s" % e)
+        return 1
     out_dir = os.environ.get("FH_OUT_DIR") or ROOT
     cache_dir = os.environ.get("FH_CACHE_DIR") or os.path.join(ROOT, ".cache")
     os.makedirs(out_dir, exist_ok=True)
@@ -170,7 +173,7 @@ def main():
     changed, failed = [], []
     for key, (fn, lid, flex_page) in LEAGUES.items():
         path = os.path.join(out_dir, fn)
-        prev = read_data(path if os.path.exists(path) else os.path.join(ROOT, fn))
+        prev = read_data(path if os.path.exists(path) else os.path.join(ROOT, fn), key, K)
         pm = (prev or {}).get("META") or {}
         same_week = bool(prev) and str(pm.get("week")) == str(week)
         prev_rows = {}
@@ -215,14 +218,14 @@ def main():
             log("%-7s unchanged data, rewriting timestamps (forced)" % key)
         else:
             log("%-7s data changed -> %s" % (key, fn))
-        write_data(path, key, d)
+        write_data(path, key, d, K)
         changed.append(key)
         unranked = [r["name"] for r in d["STARTERS"] + d["BENCH"] + d["WAIVER"] if r["fp"] == build.DASH and r["status"] in ("Healthy", "Questionable") and r["pos"] in ("RB", "WR", "TE", "QB", "K", "DEF")]
         if unranked:
-            log("        no FantasyPros rank for: %s" % ", ".join(unranked))
+            log("        no FantasyPros rank for %d player(s) (names not logged: Actions logs are public)" % len(unranked))
         noprops = [r["name"] for r in d["STARTERS"] + d["BENCH"] + d["WAIVER"] if r["pos"] in ("RB", "WR", "TE") and r["status"] not in build.SKIP_PROPS and r["pp"] is None]
         if noprops:
-            log("        no prop-implied pts (missing lines) for: %s" % ", ".join(noprops))
+            log("        no prop-implied pts (missing lines) for %d player(s)" % len(noprops))
     log("Done. Changed: %s. Failed: %s." % (", ".join(changed) or "none", ", ".join(failed) or "none"))
     return 0
 
