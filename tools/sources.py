@@ -52,6 +52,15 @@ def sleeper_schedule(season):
     return d
 
 
+def sleeper_scores(season, week):
+    """Live game states for one NFL week (status, quarter_num, time_remaining in metadata). [] if unavailable."""
+    try:
+        d = get_json("%s/scores/nfl/regular/%s/%s" % (SLEEPER, season, week))
+    except Exception:
+        return []
+    return d if isinstance(d, list) else []
+
+
 PROJ_POS = "&".join("position%5B%5D=" + p for p in ["QB", "RB", "WR", "TE", "K", "DEF"])
 
 

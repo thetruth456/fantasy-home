@@ -11,7 +11,8 @@ Model (also summarized on the page):
   are now hurt, traded or dropped no longer counts for anyone. A player counts as zero in a week when he has no
   projection (bye, or Sleeper has him out), when LONG_TERM in tools/podcast.py has him out, or (this week only)
   when Sleeper tags him Out/IR/PUP.
-  This week (in progress): starters whose NFL game is final keep their real points; open slots use the best lineup
+  This week (in progress): starters whose NFL game is final keep their real points; starters in a game under way keep their
+  points so far plus the rest of their value scaled by the game time left (Sleeper scores feed); open slots use the best lineup
   from players who have not played yet. Weekly noise = the spread of real scores around each team's average (less the part
   future injuries now explain). Future weeks also draw random injuries per player (tools/injury.py); lineups re-form from the bench.
   Standings: wins (ties = half), then points for. Playoffs: Sleeper's fixed winners bracket (no reseeding).
@@ -97,6 +98,22 @@ def tau_k(k, sd):
 # Power score weights (0-100 scale each)
 PW = dict(strength=0.40, playoff=0.30, first=0.15, title=0.15)
 FLEX = {"FLEX": {"RB", "WR", "TE"}, "SUPER_FLEX": {"QB", "RB", "WR", "TE"}, "REC_FLEX": {"WR", "TE"}, "WRRB_FLEX": {"RB", "WR"}}
+
+
+def game_left(md):
+    """Share of an NFL game still to play from Sleeper's scores metadata (quarter_num, time_remaining)."""
+    try:
+        q = int(md.get("quarter_num") or md.get("quarter") or 1)
+    except (TypeError, ValueError):
+        return 0.5
+    if md.get("is_overtime") or q > 4:
+        return 0.03
+    try:
+        mm, ss = str(md.get("time_remaining") or "15:00").split(":")
+        t = int(mm) + int(ss) / 60.0
+    except ValueError:
+        t = 7.5
+    return max(0.0, min(1.0, ((4 - q) * 15 + min(15.0, t)) / 60.0))
 
 
 def get(path):
@@ -348,7 +365,22 @@ def main(lg, sims=10000):
     P = S.sleeper_players(CACHE)
     sched = S.sleeper_schedule(season)
     done = {(g["week"], tm) for g in sched if g.get("status") == "complete" for tm in (g["home"], g["away"])}
-    live = {(g["week"], tm) for g in sched if g.get("status") == "in_progress" for tm in (g["home"], g["away"])}
+    # Sleeper marks a running game "in_game" (not "in_progress"); the scores feed adds the game clock
+    live = {(g["week"], tm) for g in sched if g.get("status") in ("in_game", "in_progress") for tm in (g["home"], g["away"])}
+    left = {}   # (week, team) -> share of the game still to play, for games under way
+    sw = S.sleeper_state()
+    live_wk = str(sw.get("season")) == str(season) and sw.get("season_type") == "regular" and int(sw.get("week") or 0) == cur
+    if live_wk:
+        for g in S.sleeper_scores(season, cur):
+            md = g.get("metadata") or {}
+            tms = [md.get("home_team"), md.get("away_team")]
+            if g.get("status") == "complete" or md.get("is_over"):
+                done |= {(cur, t) for t in tms if t}; live -= {(cur, t) for t in tms}
+            elif g.get("status") in ("in_game", "in_progress") or md.get("is_in_progress"):
+                live |= {(cur, t) for t in tms if t}
+                left.update({(cur, t): game_left(md) for t in tms if t})
+    for x in live:
+        left.setdefault(x, 0.5)   # running game with no clock in the feed: assume half is left
     LT = PC.long_term(KEY)
     proj = {}
     for w in range(cur, end + 1):
@@ -403,15 +435,19 @@ def main(lg, sims=10000):
         # this week: lock starters whose game is final (or live), refill the rest from players yet to play
         m = mcur[r]
         sp = dict(zip(m.get("starters") or [], m.get("starters_points") or []))
-        lk, free = 0.0, list(slots)
+        sp.update({p: v for p, v in (m.get("players_points") or {}).items() if v is not None})
+        lk, free, lv = 0.0, list(slots), 0.0
         for i, pid in enumerate(m.get("starters") or []):
-            if pid and pid != "0" and ((cur, nfl(pid, cur)) in done or (cur, nfl(pid, cur)) in live):
-                lk += sp.get(pid) or 0.0
+            g = (cur, nfl(pid, cur))
+            if pid and pid != "0" and (g in done or g in live):
+                lk += sp.get(pid) or 0.0          # points so far (final once his game is over)
+                if g in live and g not in done:   # game under way: the rest of his projection, scaled by time left
+                    lv += val(pid, cur) * left.get(g, 0.5)
                 free.remove(slots[i])
         avail = [(val(p, cur), pos(p), p) for p in team[r]["players"]
                  if (cur, nfl(p, cur)) not in done and (cur, nfl(p, cur)) not in live]
         locked[r] = lk
-        rem[r] = lineup(free, avail)[0]
+        rem[r] = lineup(free, avail)[0] + lv
         raw[cur][r] = lk + rem[r]
     fut = [w for w in range(cur + 1, reg_end + 1)]
     k = lg_ppg / (sum(raw[w][r] for w in fut for r in rids) / (len(fut) * len(rids)))
