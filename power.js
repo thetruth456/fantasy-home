@@ -31,22 +31,30 @@ if(/^the$/i.test(w[0])&&w.length>1)w.shift();var s=w[0];if(s.length<5&&w[1])s+="
 var SHN={},SHC={};T.forEach(function(t){var k=short0(t.name);SHC[k]=(SHC[k]||0)+1});
 T.forEach(function(t){var k=short0(t.name);SHN[t.rid]=SHC[k]>1?(String(t.name).length>15?String(t.name).slice(0,14)+"\u2026":String(t.name)):k});
 function short(nm){for(var i=0;i<T.length;i++)if(T[i].name===nm)return SHN[T[i].rid];return short0(nm)}
+function shortM(nm){var s=short(nm);return s.length>10?s.slice(0,9).replace(/[\s.]+$/,"")+"\u2026":s}
 function r0(v){return v>0&&v<0.5?"<1%":Math.round(v)+"%"}
+/* records: D.recs[rid][w-1] = [W,L,T] after completed week w (tools/records.py / power.py); the label uses the current record */
+var RC=D.recs||{},LAST=D.last==null?D.cur-1:D.last;
+function rtx(a){return a?a[0]+"-"+a[1]+(a[2]?"-"+a[2]:""):""}
+function recNow(t){return rtx([t.w,t.l,t.t])}
+function recAt(rid,h){if(h.week<=0)return "";var a=RC[rid],w=h.live?LAST:Math.min(h.week,LAST);return a&&w>0?rtx(a[w-1]):""}
+var recNote=LAST<D.cur?'Records are through week '+LAST+' (week '+D.cur+' in progress).':'Records are through week '+LAST+'.';
 var order=T.slice().sort(function(a,b){return b.playoff-a.playoff||b.bye-a.bye}),ci={},cd={};order.forEach(function(t,i){ci[t.rid]=COL[i%COL.length];cd[t.rid]=DASH[i%DASH.length]});
-function svg(k,mob,cp){var W=mob?400:cp?1200:1000,Ht=mob?(cp?350:440):cp?330:430,fs=mob?(cp?12:11):14,lw=mob?(cp?140:126):172,ml=mob?34:44,mr=lw,mt=14,mb=mob?24:30,cw=W-ml-mr,ch=Ht-mt-mb,gap=Math.round(fs*1.4);
+function svg(k,mob,cp){/* mobile: two-line end labels (name, then record and odds) so they stay readable without eating the plot width */
+var W=mob?400:cp?1200:1000,Ht=mob?(cp?460:500):cp?330:430,fs=mob?12:14,lw=mob?118:214,ml=mob?34:44,mr=lw,mt=14,mb=mob?24:30,cw=W-ml-mr,ch=Ht-mt-mb,gap=Math.round(fs*(mob?2.45:1.4));
 function X(i){return ml+cw*i/(n-1)}function Y(v){return mt+ch*(1-v/100)}
 var g='<svg class="oc oc-'+k+'" viewBox="0 0 '+W+' '+Ht+'" style="font-size:'+fs+'px" role="img" aria-label="'+(k==="po"?"Playoff":"Bye")+' odds by week">';
 [0,25,50,75,100].forEach(function(v){g+='<line class="gl" x1="'+ml+'" x2="'+(W-mr)+'" y1="'+Y(v)+'" y2="'+Y(v)+'"/><text class="ax" x="'+(ml-6)+'" y="'+(Y(v)+4)+'" text-anchor="end">'+v+'%</text>'});
 H.forEach(function(h,i){var l=xl(h);g+='<text class="ax" x="'+X(i)+'" y="'+(Ht-8)+'" text-anchor="middle">'+(mob&&l.indexOf("-")>0?'<tspan x="'+X(i)+'" dy="-0.55em">'+l.split("-")[0]+'-</tspan><tspan x="'+X(i)+'" dy="1.1em">'+l.split("-")[1]+'</tspan>':l)+'</text>'});
 /* end labels with collision avoidance */
 var L=order.map(function(t){var y=Y(H[n-1][k][t.rid]);return{t:t,y0:y,y:y}}).sort(function(a,b){return a.y0-b.y0||b.t.playoff-a.t.playoff});
-var lo=mt+fs*0.4,hi=mt+ch;L.forEach(function(l,i){l.y=Math.max(l.y0,i?L[i-1].y+gap:lo)});
+var lo=mt+fs*(mob?0.9:0.4),hi=mt+ch-(mob?fs*0.6:0);L.forEach(function(l,i){l.y=Math.max(l.y0,i?L[i-1].y+gap:lo)});
 for(var i=L.length-1;i>=0;i--){var mx=i===L.length-1?hi:L[i+1].y-gap;if(L[i].y>mx)L[i].y=mx}
 var ly={};L.forEach(function(l){ly[l.t.rid]=l});
 order.slice().reverse().forEach(function(t){var pts=H.map(function(h,i){return X(i).toFixed(1)+","+Y(h[k][t.rid]).toFixed(1)}).join(" "),l=ly[t.rid],xe=X(n-1),lx=xe+(mob?18:34);
-g+='<g data-r="'+t.rid+'" style="color:'+ci[t.rid]+'" onclick="powerFocus(this,'+t.rid+')"><polyline class="ln" points="'+pts+'"'+(cd[t.rid]?' stroke-dasharray="'+cd[t.rid]+'"':'')+'/><polyline class="hit" points="'+pts+'"><title>'+esc(t.name)+'</title></polyline>';
-H.forEach(function(h,i){g+='<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(h[k][t.rid]).toFixed(1)+'"><title>'+esc(t.name)+', '+xl(h)+': '+pc(h[k][t.rid])+'</title></circle>'});
-g+='<path class="ld" d="M'+(xe+5)+' '+l.y0.toFixed(1)+'L'+(lx-4)+' '+l.y.toFixed(1)+'"/><text class="lb" x="'+lx+'" y="'+(l.y+fs*0.36).toFixed(1)+'">'+esc(short(t.name))+' <tspan class="lv">'+r0(H[n-1][k][t.rid])+'</tspan><title>'+esc(t.name)+'</title></text></g>'});
+g+='<g data-r="'+t.rid+'" style="color:'+ci[t.rid]+'" onclick="powerFocus(this,'+t.rid+')"><polyline class="ln" points="'+pts+'"'+(cd[t.rid]?' stroke-dasharray="'+cd[t.rid]+'"':'')+'/><polyline class="hit" points="'+pts+'"><title>'+esc(t.name)+' ('+recNow(t)+')</title></polyline>';
+H.forEach(function(h,i){g+='<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(h[k][t.rid]).toFixed(1)+'"><title>'+esc(t.name)+', '+xl(h)+': '+pc(h[k][t.rid])+(function(r){return r?' (record '+r+(h.live?', week '+h.week+' in progress':' after week '+Math.min(h.week,LAST))+')':''})(recAt(t.rid,h))+'</title></circle>'});
+g+='<path class="ld" d="M'+(xe+5)+' '+l.y0.toFixed(1)+'L'+(lx-4)+' '+l.y.toFixed(1)+'"/><text class="lb" x="'+lx+'" y="'+(l.y+fs*(mob?-0.15:0.36)).toFixed(1)+'">'+esc(mob?shortM(t.name):short(t.name))+(mob?'<tspan class="l2" x="'+lx+'" dy="1.15em">':' ')+'<tspan class="rc">('+recNow(t)+')</tspan> <tspan class="lv">'+r0(H[n-1][k][t.rid])+'</tspan>'+(mob?'</tspan>':'')+'<title>'+esc(t.name)+' ('+recNow(t)+')</title></text></g>'});
 return g+'</svg>'}
 /* one builder per league (several leagues can be on one page); the resize handler redraws each chart with its own */
 var OB=window.__oddsB=window.__oddsB||{};OB[KEY]=function(mob,cp){return svg("po",mob,cp)+(NB?svg("bye",mob,cp):"")};
@@ -61,11 +69,11 @@ var meth=cp?'':'<h3 class="mh">How the odds are built</h3><ul class="meth">'+
 '<li><b>Each week:</b> real points per game blend in with projections, and the roster edge is trusted more ('+D.beta_now+' now).</li>'+
 '<li><b>Rest of season:</b> simulated '+D.sims.toLocaleString("en-US")+' times; every score varies by \u00b1'+f1(D.sd_noise)+' pts, plus a hidden boost or drag per team (\u00b1'+f1(D.tau_now)+' now).</li>'+
 '<li><b>Injuries:</b> in each simulated week a healthy player can start missing games (about '+Math.round(100*(hz.RB||0))+'% chance per game at QB/RB/WR/TE, from Sleeper game logs 2021\u201325) for 1 game up to the rest of the season; the best lineup re-forms from the bench or waivers, so depth matters.</li></ul>';
-if(cp)h.push('<section class="odds repodds" data-k="po"><h2>Playoff odds through the season</h2><p class="cap">Each point is the Power Rankings simulation rerun with only what was known after that week (W'+D.cur+'* = now). Tap a team to spotlight it'+(opt.link?'; method on the <a href="'+esc(opt.link)+'">Power Rankings</a> tab':'')+'.</p>');
-else h.push('<section class="odds" data-k="po"><h2>Odds through the season</h2><p class="cap">Each point reruns the simulation with only what was known after that week. Pre-draft = '+(noKeep?'before the draft':'keepers only')+'; Pre = after the draft; W'+D.cur+'* = now (week '+D.cur+' in progress). Hover or tap a team to spotlight it.</p>');
+if(cp)h.push('<section class="odds repodds" data-k="po"><h2>Playoff odds through the season</h2><p class="cap">Each point is the Power Rankings simulation rerun with only what was known after that week (W'+D.cur+'* = now). Tap a team to spotlight it'+(opt.link?'; method on the <a href="'+esc(opt.link)+'">Power Rankings</a> tab':'')+'. '+recNote+'</p>');
+else h.push('<section class="odds" data-k="po"><h2>Odds through the season</h2><p class="cap">Each point reruns the simulation with only what was known after that week. Pre-draft = '+(noKeep?'before the draft':'keepers only')+'; Pre = after the draft; W'+D.cur+'* = now (week '+D.cur+' in progress). Hover or tap a team to spotlight it. '+recNote+'</p>');
 if(NB)h.push('<div class="seg"><button type="button" aria-pressed="true" onclick="powerOdds(this,\'po\')">Playoff %</button><button type="button" aria-pressed="false" onclick="powerOdds(this,\'bye\')">Bye %</button></div>');
 h.push('<div class="ocw" data-key="'+esc(KEY)+'" data-m="'+isMob()+'" data-c="'+(cp?1:0)+'">'+OB[KEY](isMob(),cp)+'</div><div class="ol">');
-order.forEach(function(t){h.push('<button type="button" data-r="'+t.rid+'" onclick="powerFocus(this,'+t.rid+')"><svg width="26" height="8"><line x1="1" y1="4" x2="25" y2="4" stroke="'+ci[t.rid]+'" stroke-width="4"'+(cd[t.rid]?' stroke-dasharray="7 3"':'')+'/></svg>'+esc(short(t.name))+' <b class="v-po">'+r0(t.playoff)+'</b><b class="v-bye">'+r0(t.bye)+'</b></button>')});
+order.forEach(function(t){h.push('<button type="button" data-r="'+t.rid+'" onclick="powerFocus(this,'+t.rid+')"><svg width="26" height="8"><line x1="1" y1="4" x2="25" y2="4" stroke="'+ci[t.rid]+'" stroke-width="4"'+(cd[t.rid]?' stroke-dasharray="7 3"':'')+'/></svg><span class="nm">'+esc(short(t.name))+'</span><span class="rc">('+recNow(t)+')</span><b class="v-po">'+r0(t.playoff)+'</b><b class="v-bye">'+r0(t.bye)+'</b></button>')});
 h.push('</div>'+meth+'</section>')
 return h.join("")}
 window.buildPowerOdds=function(D,opt){return D?oddsChart(D,opt):""};

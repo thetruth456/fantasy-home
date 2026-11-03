@@ -328,12 +328,15 @@ def main(lg, sims=10000):
 
     # ---------------- season so far
     rec = {r: dict(w=0, l=0, t=0, pf=0.0, pa=0.0, scores=[]) for r in rids}
+    recs = {}
     for w in range(1, last + 1):
         pts = {m["roster_id"]: m.get("points") or 0.0 for m in M[w]}
         for a, b in pairs(w):
             for x, y in ((a, b), (b, a)):
                 rec[x]["pf"] += pts[x]; rec[x]["pa"] += pts[y]; rec[x]["scores"].append(pts[x])
                 rec[x]["w" if pts[x] > pts[y] else "l" if pts[x] < pts[y] else "t"] += 1
+        for r in rids:   # record after each completed week (chart labels / hover; same counts as tools/records.py)
+            recs.setdefault(str(r), []).append([rec[r]["w"], rec[r]["l"], rec[r]["t"]])
     ppg = {r: rec[r]["pf"] / last for r in rids}
     lg_ppg = sum(ppg.values()) / len(rids)
     res = [s - ppg[r] for r in rids for s in rec[r]["scores"]]
@@ -545,7 +548,7 @@ def main(lg, sims=10000):
                 bracket=[dict(r=x["r"], m=x["m"], a=sdesc(x["a"]), b=sdesc(x["b"]), final=x["final"]) for x in BR],
                 cal=dict(source=CAL["source"], n=CAL["n"], seasons=CAL["seasons"], beta_c=BETA_C, pre_slope=PRE_SLOPE, sig_draft=SIG_DRAFT, v_inj=V_INJ),
                 keepers_n=sum(len(v) for v in keep.values()),
-                hist=hist, season=season, asof=now.strftime("%Y-%m-%dT%H:%M:%SZ"), last=last, cur=cur, reg_end=reg_end, pstart=pstart, end=end,
+                hist=hist, recs=recs, season=season, asof=now.strftime("%Y-%m-%dT%H:%M:%SZ"), last=last, cur=cur, reg_end=reg_end, pstart=pstart, end=end,
                 sims=sims, sd=round(sd, 1), k=round(k, 3), g0=G0, w_now=round(blend_w(last), 2), tau0=TAU0, tau_now=round(TK, 1), tau_pre=round(tau_pre(), 1), beta0=BETA0, sd_noise=round(sd_e, 1), npath=NPATH, inj_hazard=INJ.HAZARD, beta_now=round(B, 2), draft_type=drafts[0].get("type"), pw=PW, nplay=nplay,
                 locked_games=sorted({tm for (w, tm) in done | live if w == cur}),
                 teams=rows)
