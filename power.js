@@ -86,7 +86,13 @@ return g+'</svg>'}
 window.powerOddsBuild=function(mob){return svg("po",mob)+svg("bye",mob)};
 function isMob(){return (window.innerWidth||1000)<700}
 if(!window.__oddsRz){window.__oddsRz=1;window.addEventListener("resize",function(){var m=isMob();[].forEach.call(document.querySelectorAll(".odds .ocw"),function(w){if(w.getAttribute("data-m")!==String(m)&&window.powerOddsBuild){w.setAttribute("data-m",String(m));w.innerHTML=window.powerOddsBuild(m);oddsDim(w.closest(".odds"))}})})}
-h.push('<section class="odds" data-k="po"><h2>Odds through the season</h2><p class="cap">Each point reruns the simulation with only what was known after that week. Pre-draft = keepers only; Pre = after the draft; W'+D.cur+'* = now (week '+D.cur+' in progress). Hover or tap a team to spotlight it.</p>');
+var hz=D.inj_hazard||{};
+h.push('<section class="odds" data-k="po"><h2>Odds through the season</h2><ul class="meth">'+
+'<li><b>Pre-draft:</b> everyone starts level; keepers add how much better they are than what their pick usually gets.</li>'+
+'<li><b>After the draft:</b> each drafted roster\u2019s projected value, but only '+D.beta0+' of its edge over average counts (how much draft edges held up in Best League 2022\u201325).</li>'+
+'<li><b>Each week:</b> real points per game blend in with projections, and the roster edge is trusted more ('+D.beta_now+' now).</li>'+
+'<li><b>Rest of season:</b> simulated '+D.sims.toLocaleString("en-US")+' times; every score varies by \u00b1'+f1(D.sd_noise)+' pts, plus a hidden boost or drag per team (\u00b1'+f1(D.tau_now)+' now).</li>'+
+'<li><b>Injuries:</b> in each simulated week a healthy player can start missing games (about '+Math.round(100*(hz.RB||0))+'% chance per game at QB/RB/WR/TE, from Sleeper game logs 2021\u201325) for 1 game up to the rest of the season; the best lineup re-forms from the bench or waivers, so depth matters.</li></ul><p class="cap">Each point reruns the simulation with only what was known after that week. Pre-draft = keepers only; Pre = after the draft; W'+D.cur+'* = now (week '+D.cur+' in progress). Hover or tap a team to spotlight it.</p>');
 h.push('<div class="seg"><button type="button" aria-pressed="true" onclick="powerOdds(this,\'po\')">Playoff %</button><button type="button" aria-pressed="false" onclick="powerOdds(this,\'bye\')">Bye %</button></div>');
 h.push('<div class="ocw" data-m="'+isMob()+'">'+window.powerOddsBuild(isMob())+'</div><div class="ol">');
 order.forEach(function(t){h.push('<button type="button" data-r="'+t.rid+'" onclick="powerFocus(this,'+t.rid+')"><svg width="26" height="8"><line x1="1" y1="4" x2="25" y2="4" stroke="'+ci[t.rid]+'" stroke-width="4"'+(cd[t.rid]?' stroke-dasharray="7 3"':'')+'/></svg>'+esc(short(t.name))+' <b class="v-po">'+r0(t.playoff)+'</b><b class="v-bye">'+r0(t.bye)+'</b></button>')});
@@ -109,11 +115,10 @@ h.push('</tbody></table></div></section>');
 
 /* ---- methodology */
 h.push('<section><h2>Methodology</h2><ul class="meth">'+
-'<li><b>Strength:</b> each player = his points per game this season, weighted by games played (gp \u00f7 (gp + '+D.g0+'), so 50% at '+D.g0+' games), plus his Sleeper projection that week for the rest; each team\u2019s edge over the league average is then scaled by '+D.beta_now+' (how much past seasons say these edges hold up); a team = its best lineup from the current roster, so points from players now hurt, traded or dropped don\u2019t count. Byes, this week\u2019s Out/IR tags and long-term injuries count as zero.</li>'+
-'<li><b>Simulation:</b> '+D.sims.toLocaleString("en-US")+' runs of weeks '+D.cur+'\u2013'+D.reg_end+' on the real schedule; each score varies by \u00b1'+f1(D.sd)+' pts (the real week-to-week spread). Week '+D.cur+' keeps points already scored.</li>'+
-'<li><b>Odds through the season:</b> Pre-draft starts everyone level except for keepers (a keeper counts for how much better he is than what that pick usually gets). Pre adds the whole drafted roster (Sleeper preseason projections). In Best League 2022\u201325, draft value explained only about half of the real gaps between teams, so the start trusts it about half ('+D.beta0+'), and trust in the roster model grows each week ('+D.beta_now+' now). Each later point reruns the model with only what was known after that week. Every simulated season also gives each team a hidden boost or drag (typical size '+D.tau_pre+' pts/wk pre-draft, '+D.tau0+' after the draft, '+D.tau_now+' now).</li>'+
+'<li><b>Strength:</b> each player = his points per game this season, weighted by games played (gp \u00f7 (gp + '+D.g0+'), so 50% at '+D.g0+' games), plus his Sleeper projection that week for the rest; a team = its best lineup from the current roster, so points from players now hurt, traded or dropped don\u2019t count. Byes, this week\u2019s Out/IR tags and long-term injuries count as zero.</li>'+
 '<li><b>Standings:</b> wins, then points for. Top '+D.nplay+' make it; seeds 1\u20132 get a bye; Sleeper\u2019s fixed bracket (no reseeding); title odds simulate weeks '+D.pstart+'\u2013'+D.end+'.</li>'+
-'<li><b>Caveat:</b> projections and injury timelines are estimates, and future trades and waiver moves aren\u2019t modeled. Data: Sleeper.</li></ul></section>');
+'<li><b>Odds and simulation:</b> see the bullets above the odds chart. Week '+D.cur+' keeps points already scored.</li>'+
+'<li><b>Caveat:</b> projections and injury timelines are estimates; future trades aren\u2019t modeled and waiver pickups only fill in for injuries. Data: Sleeper.</li></ul></section>');
 return h.join("");
 };
 })();

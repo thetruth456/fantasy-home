@@ -10,7 +10,8 @@ Model (also summarized on the page):
   projection (bye, or Sleeper has him out), when LONG_TERM in tools/podcast.py has him out, or (this week only)
   when Sleeper tags him Out/IR/PUP.
   This week (in progress): starters whose NFL game is final keep their real points; open slots use the best lineup
-  from players who have not played yet. Weekly noise = the spread of real scores around each team's average.
+  from players who have not played yet. Weekly noise = the spread of real scores around each team's average (less the part
+  future injuries now explain). Future weeks also draw random injuries per player (tools/injury.py); lineups re-form from the bench.
   Standings: wins (ties = half), then points for. Playoffs: 6 teams, seeds 1-2 bye, fixed bracket.
 """
 import json, os, sys, math, random, datetime
@@ -18,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sources as S
 import podcast as PC
 import draftprior as DP
+import injury as INJ
 
 LEAGUE = PC.LEAGUE
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,17 +28,25 @@ CACHE = os.environ.get("FH_CACHE_DIR") or os.path.join(ROOT, ".cache")
 G0 = 7.0                  # player level: weight on his 2026 points per game = gp / (gp + G0), rest = Sleeper projection
                           # (1 game 13%, 4 games 36%, 7 games 50%, 13 games 65%: more projection early, more real points later)
 # Bayesian team strength, calibrated on Best League 2022-2025 (48 team-seasons; reproduce with tools/power_calibrate.py):
-# * Prior = the draft. Post-draft value (tools/draftprior.py) predicts real season PPG with slope BETA0 = 0.49 (se 0.24):
-#   a team drafted 10 pts/wk above average is expected to be ~5 above. What it misses (trades, waivers, injuries, luck in
-#   who breaks out) has sd TAU0 = 5.1 pts/wk after removing week-to-week noise.
-# * Pre-draft = keeper surplus only, same slope (post-draft value tracks keeper surplus 1:1, slope 1.04), plus the spread of
-#   how drafts deviate from ADP (SIG_DRAFT = 4.75 pts/wk of draft value) as extra uncertainty.
+# * Future injuries are simulated (tools/injury.py): every player can miss games at Sleeper-measured per-game rates, for a
+#   drawn number of games, and the best lineup re-forms from the rest of the roster (plus a waiver fill-in). A team's
+#   expected value = its lineup averaged over those injury paths, so depth counts; each simulated season then follows one path.
+# * Prior = the draft. Post-draft value (tools/draftprior.py, injury-averaged) predicts real season PPG with slope BETA0 = 0.51
+#   (se 0.25). What it misses has sd 8.0; after removing week-to-week noise and the injury paths' own spread (the sim adds
+#   those explicitly) that leaves TAU0 = 4.6 pts/wk (trades, waivers, breakouts and busts).
+# * Pre-draft = keeper surplus only, times PRE_SLOPE = 0.95 (how post-draft value tracked keeper surplus), plus the spread of
+#   how drafts deviate from that (SIG_DRAFT = 4.68 pts/wk) and the injury spread (V_INJ = 5.18, its rosters are unknown) as
+#   extra uncertainty.
 # * In season, the roster model's edge over average is trusted more each week: beta_t = 1 - (1 - BETA0) * C / (C + t),
-#   C = 8.3 fitted to how well the week-t model predicted rest-of-season PPG in 2022-2025 (0.49 -> 0.73 after week 7).
+#   C = 7.6 fitted to how well the week-t model (injury-averaged) predicted rest-of-season PPG in 2022-2025 (0.51 -> 0.74
+#   after week 7).
 # * Every simulated season draws one persistent offset per team ~ N(0, tau_t), tau_t = 1/sqrt(1/TAU0^2 + t/sd^2)
-#   (normal-normal update with weekly noise sd).
-BETA0, BETA_C, SIG_DRAFT = 0.49, 8.3, 4.75
-TAU0 = float(os.environ.get("FH_POWER_TAU0", "5.1"))
+#   (normal-normal update with weekly noise sd). Weekly noise is reduced to sqrt(sd^2 - injury week-to-week variance) so the
+#   total weekly spread still matches real scores.
+# (Without the injury model the same calibration gives BETA0 0.49, C 8.3, TAU0 5.1, SIG_DRAFT 4.75, slope 1.04.)
+BETA0, BETA_C, SIG_DRAFT, PRE_SLOPE, V_INJ = 0.51, 7.6, 4.68, 0.95, 5.18
+TAU0 = float(os.environ.get("FH_POWER_TAU0", "4.6"))
+NPATH = int(os.environ.get("FH_POWER_PATHS", "2000"))   # injury paths per team (each simulated season picks one)
 
 
 def beta_t(t):
@@ -44,7 +54,20 @@ def beta_t(t):
 
 
 def tau_pre():
-    return math.sqrt(TAU0 ** 2 + (BETA0 * SIG_DRAFT) ** 2)
+    return math.sqrt(TAU0 ** 2 + V_INJ + (BETA0 * SIG_DRAFT) ** 2)
+
+
+def inj_model(slots, cands, weeks, fa, rids, seed, n=None):
+    """Per team: injury paths over weeks. Returns (expected lineup by week/team, paths by team, within-season variance)."""
+    rng = random.Random(seed)
+    E, PT, vw = {w: {} for w in weeks}, {}, []
+    for r in rids:
+        mean, paths = INJ.team_paths(slots, lineup, {w: cands[w][r] for w in weeks}, weeks, n or NPATH, rng, fa)
+        for w in weeks:
+            E[w][r] = mean[w]
+        PT[r] = paths
+        vw.append(INJ.path_var(paths, weeks)[0])
+    return E, PT, (sum(vw) / len(vw) if vw else 0.0)
 
 
 def blend_w(gp):
@@ -91,12 +114,13 @@ def history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT
     pj = {w: {e["player_id"]: e for e in S.sleeper_projections(season, w, "regular") if e.get("player_id")} for w in range(1, last + 2)}
     stats = {w: S.sleeper_stats(season, w, "regular") for w in range(1, last + 1)}
     out = []
-    post_dev, pre_dev = prior
+    post_dev, pre_dev, paths0, vw0 = prior
     for t in range(-1, last + 1):
-        if t <= 0:  # -1 = before the draft (keepers only), 0 = after the draft: no games yet, prior only
-            dev = pre_dev if t < 0 else post_dev
-            out.append(dict(week=t, **sim_odds({w: {r: 100.0 + BETA0 * dev[r] for r in rids} for w in range(1, reg_end + 1)},
-                                               {r: [0.0, 0.0] for r in rids}, rids, pairs, nplay, sd, tau_pre() if t < 0 else TAU0, sims, 1000 + t)))
+        if t <= 0:  # -1 = before the draft (keepers only, rosters and so injuries unknown: in the noise), 0 = after the draft
+            pre = t < 0
+            out.append(dict(week=t, **sim_odds({w: {r: 100.0 + (BETA0 * PRE_SLOPE * pre_dev[r] if pre else BETA0 * post_dev[r]) for r in rids} for w in range(1, reg_end + 1)},
+                                               {r: [0.0, 0.0] for r in rids}, rids, pairs, nplay, sd if pre else math.sqrt(sd ** 2 - vw0),
+                                               tau_pre() if pre else TAU0, sims, 1000 + t, None if pre else paths0)))
             S.log("history %s done" % ("pre-draft" if t < 0 else "post-draft"))
             continue
         nxt = t + 1
@@ -132,7 +156,7 @@ def history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT
                         return v, e.get("team")
             return 0.0, (P.get(pid) or {}).get("team")
         weeks = list(range(nxt, reg_end + 1))
-        mu = {w: {} for w in weeks}
+        mu, cw = {w: {} for w in weeks}, {}
         for r in rids:
             vals = {}
             for pid in roster.get(r, []):
@@ -153,34 +177,48 @@ def history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT
                     if out_now and (w == nxt or (lt and (lt["back"] == "season" or w < lt["back"]["week"]))):
                         continue
                     c.append((v, (P.get(pid) or {}).get("position") or "", pid))
+                cw.setdefault(w, {})[r] = c
                 mu[w][r] = lineup(slots, c)[0]
+        # future injuries from week t+2 (week t+1's injury report is known); waiver fill-ins from week t+1 projections
+        rost = {p for v in roster.values() for p in v}
+        fa = INJ.fa_floor([(max(0.0, fpts(e.get("stats") or {})), (P.get(pid) or {}).get("position") or "", pid) for pid, e in pj[nxt].items()], rost)
+        fw = weeks[1:]
+        E, PT, vw = inj_model(slots, cw, fw, fa, rids, 3000 + t, NPATH // 2)
+        for w in fw:
+            for r in rids:
+                mu[w][r] = E[w][r]
         if t >= 1:  # scale to the league's real scoring level so far
             lg = sum(rec[r][1] for r in rids) / (t * len(rids))
             k = lg / (sum(mu[w][r] for w in weeks for r in rids) / (len(weeks) * len(rids)))
             for w in weeks:
                 for r in rids:
                     mu[w][r] *= k
+        else:
+            k = 1.0
         b = beta_t(t)
         for w in weeks:  # shrink each team's edge over the league toward the prior's trust level
             lw = sum(mu[w].values()) / len(rids)
             for r in rids:
                 mu[w][r] = lw + b * (mu[w][r] - lw)
-        out.append(dict(week=t, **sim_odds(mu, rec, rids, pairs, nplay, sd, tau_k(t, sd), sims, 1000 + t)))
+        out.append(dict(week=t, **sim_odds(mu, rec, rids, pairs, nplay, math.sqrt(sd ** 2 - k * k * vw), tau_k(t, sd), sims, 1000 + t, PT, k)))
         S.log("history after week %d done" % t)
     return out
 
 
-def sim_odds(mu, rec, rids, pairs, nplay, sd, tk, sims, seed):
-    rng = random.Random(seed)
+def sim_odds(mu, rec, rids, pairs, nplay, sd, tk, sims, seed, inj=None, k=1.0):
+    """inj: {rid: [path {week: lineup change vs expected}]} (one path drawn per team per simulated season), scaled by k."""
+    rng, irng = random.Random(seed), random.Random(seed + 77)   # separate stream for injury paths: same scoring draws as without
     weeks = sorted(mu)
     po, bye = {r: 0 for r in rids}, {r: 0 for r in rids}
     PR = {w: pairs(w) for w in weeks}
     for _ in range(sims):
         W = {r: rec[r][0] for r in rids}; F = {r: rec[r][1] for r in rids}
         off = {r: rng.gauss(0, tk) if tk else 0.0 for r in rids}
+        ip = {r: inj[r][irng.randrange(len(inj[r]))] for r in rids} if inj else None
         for w in weeks:
             for a, b in PR[w]:
-                x, y = rng.gauss(mu[w][a] + off[a], sd), rng.gauss(mu[w][b] + off[b], sd)
+                da, db = (k * ip[a].get(w, 0.0), k * ip[b].get(w, 0.0)) if ip else (0.0, 0.0)
+                x, y = rng.gauss(mu[w][a] + off[a] + da, sd), rng.gauss(mu[w][b] + off[b] + db, sd)
                 F[a] += x; F[b] += y
                 if x > y: W[a] += 1
                 elif y > x: W[b] += 1
@@ -291,9 +329,15 @@ def main():
     raw = {w: {} for w in range(cur, end + 1)}
     locked, rem = {}, {}
     mcur = {m["roster_id"]: m for m in M[cur]}
+    allf = list(range(cur + 1, end + 1))
+    cw = {w: {r: [c for c in ((val(p, w), pos(p), p) for p in team[r]["players"]) if c[0] > 0] for r in rids} for w in allf}
+    rost = {p for r in rids for p in team[r]["players"]}
+    fa = {w: INJ.fa_floor([(val(p, w), pos(p), p) for p in proj[w]], rost) for w in allf}
+    healthy = {w: {r: lineup(slots, cw[w][r])[0] for r in rids} for w in allf}
+    E, PT, vw = inj_model(slots, cw, allf, fa, rids, 20261102)
     for r in rids:
-        for w in range(cur + 1, end + 1):
-            raw[w][r] = lineup(slots, [(val(p, w), pos(p), p) for p in team[r]["players"]])[0]
+        for w in allf:
+            raw[w][r] = E[w][r]
         # this week: lock starters whose game is final (or live), refill the rest from players yet to play
         m = mcur[r]
         sp = dict(zip(m.get("starters") or [], m.get("starters_points") or []))
@@ -327,6 +371,9 @@ def main():
         mu[cur][r] = locked[r] + rs
         frac[r] = rs / mu[cur][r] if mu[cur][r] else 1.0
     strength = {r: sum(mu[w][r] for w in fut) / len(fut) for r in rids}
+    inj_cost = {r: k * sum(healthy[w][r] - E[w][r] for w in fut) / len(fut) for r in rids}
+    inj_sd = {r: k * math.sqrt(INJ.path_var(PT[r], fut)[1]) for r in rids}
+    sd_e = math.sqrt(sd ** 2 - k * k * vw)   # weekly noise left once injuries are simulated explicitly
     ap = {r: 100 * sum(phi((mu[w][r] - mu[w][o]) / (sd * math.sqrt(2))) for w in fut for o in rids if o != r) / (len(fut) * (len(rids) - 1)) for r in rids}
 
     # ---------------- schedule left
@@ -340,6 +387,7 @@ def main():
     TK = tau_k(last, sd)
 
     def simulate(rng, pairfn, n, playoffs):
+        irng = random.Random(rng.random())   # injury-path picks on their own stream
         seedc = {r: [0] * nplay for r in rids}
         finc = {r: [0] * len(rids) for r in rids}
         title, final, wins_sum = {r: 0 for r in rids}, {r: 0 for r in rids}, {r: 0.0 for r in rids}
@@ -347,8 +395,9 @@ def main():
             W = {r: rec[r]["w"] + 0.5 * rec[r]["t"] for r in rids}
             F = {r: rec[r]["pf"] for r in rids}
             off = {r: rng.gauss(0, TK) if TK else 0.0 for r in rids}
+            ip = {r: PT[r][irng.randrange(len(PT[r]))] for r in rids}
             for w in range(cur, reg_end + 1):
-                sc = {r: rng.gauss(mu[w][r] + (off[r] if w > cur else frac[r] * off[r]), sd * (math.sqrt(frac[r]) if w == cur else 1)) for r in rids}
+                sc = {r: rng.gauss(mu[w][r] + (off[r] + k * ip[r][w] if w > cur else frac[r] * off[r]), sd_e * (math.sqrt(frac[r]) if w == cur else 1)) for r in rids}
                 for a, b in pairfn(w):
                     F[a] += sc[a]; F[b] += sc[b]
                     if sc[a] > sc[b]: W[a] += 1
@@ -363,7 +412,7 @@ def main():
             s_ = order[:nplay]
 
             def g(a, b, w):
-                x, y = rng.gauss(mu[w][a] + off[a], sd), rng.gauss(mu[w][b] + off[b], sd)
+                x, y = rng.gauss(mu[w][a] + off[a] + k * ip[a][w], sd_e), rng.gauss(mu[w][b] + off[b] + k * ip[b][w], sd_e)
                 return a if x >= y else b
             # Sleeper's winners bracket (fixed, no reseeding): 4v5 and 3v6, then 1 v (4/5) and 2 v (3/6)
             q1, q2 = g(s_[3], s_[4], pstart), g(s_[2], s_[5], pstart)
@@ -410,22 +459,31 @@ def main():
     # draft-value prior (keepers, post-draft value)
     drafts = get("/v1/league/%s/drafts" % LEAGUE)
     picks = get("/v1/draft/%s/picks" % drafts[0]["draft_id"])
-    post_dev, pre_dev, keep = DP.values(DP.season_projections(season), picks, slots, fpts, lineup)
+    sproj = DP.season_projections(season)
+    post_dev, pre_dev, keep = DP.values(sproj, picks, slots, fpts, lineup)
+    PV = DP.player_values(sproj, fpts)
+    dc = DP.rosters(PV, picks)
+    allw = list(range(1, reg_end + 1))
+    E0, PT0, vw0 = inj_model(slots, {w: dc for w in allw}, allw, INJ.fa_floor([(q["v"], q["pos"], pid) for pid, q in PV.items()], {p["player_id"] for p in picks}), rids, 999)
+    e0 = {r: sum(E0[w][r] for w in allw) / len(allw) for r in rids}
+    m0 = sum(e0.values()) / len(rids)
+    inj_dev = {r: e0[r] - m0 for r in rids}
     for x in rows:
         x["keepers"] = keep.get(x["rid"], [])
-        x["draft_dev"], x["keeper_dev"] = round(post_dev[x["rid"]], 1), round(pre_dev[x["rid"]], 1)
-    hist = [] if os.environ.get("FH_POWER_NO_HISTORY") else history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT, P, sd, sims, (post_dev, pre_dev))
+        x["draft_dev"], x["keeper_dev"], x["draft_inj_dev"] = round(post_dev[x["rid"]], 1), round(pre_dev[x["rid"]], 1), round(inj_dev[x["rid"]], 1)
+        x["inj_cost"], x["inj_sd"] = round(inj_cost[x["rid"]], 1), round(inj_sd[x["rid"]], 1)
+    hist = [] if os.environ.get("FH_POWER_NO_HISTORY") else history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT, P, sd, sims, (inj_dev, pre_dev, PT0, vw0))
     by_r = {x["rid"]: x for x in rows}
     hist.append(dict(week=cur, live=True, po={r: by_r[r]["playoff"] for r in rids}, bye={r: by_r[r]["bye"] for r in rids}))
     now = datetime.datetime.now(datetime.timezone.utc)
     data = dict(hist=hist, season=season, asof=now.strftime("%Y-%m-%dT%H:%M:%SZ"), last=last, cur=cur, reg_end=reg_end, pstart=pstart, end=end,
-                sims=sims, sd=round(sd, 1), k=round(k, 3), g0=G0, w_now=round(blend_w(last), 2), tau0=TAU0, tau_now=round(TK, 1), tau_pre=round(tau_pre(), 1), beta0=BETA0, beta_now=round(B, 2), draft_type=drafts[0].get("type"), pw=PW, nplay=nplay,
+                sims=sims, sd=round(sd, 1), k=round(k, 3), g0=G0, w_now=round(blend_w(last), 2), tau0=TAU0, tau_now=round(TK, 1), tau_pre=round(tau_pre(), 1), beta0=BETA0, sd_noise=round(sd_e, 1), npath=NPATH, inj_hazard=INJ.HAZARD, beta_now=round(B, 2), draft_type=drafts[0].get("type"), pw=PW, nplay=nplay,
                 locked_games=sorted({tm for (w, tm) in done | live if w == cur}),
                 teams=rows)
     with open(OUT, "w") as f:
         f.write("/* Static snapshot generated by tools/power.py. The update workflow does not touch this file. */\n")
         f.write("window.POWER=window.POWER||{};\nwindow.POWER.best=" + json.dumps(data, separators=(",", ":"), ensure_ascii=False) + ";\n")
-    S.log("wrote %s (weeks %d-%d left, %d sims, sd %.1f, k %.3f, tau %.1f)" % (OUT, cur, reg_end, sims, sd, k, TK))
+    S.log("wrote %s (weeks %d-%d left, %d sims, sd %.1f -> %.1f with injuries, k %.3f, tau %.1f)" % (OUT, cur, reg_end, sims, sd, sd_e, k, TK))
 
 
 if __name__ == "__main__":

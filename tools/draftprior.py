@@ -16,7 +16,16 @@ def season_projections(season):
     return S.get_json("%s/projections/nfl/%s?season_type=regular&%s&order_by=adp_half_ppr" % (S.SLEEPER, season, S.PROJ_POS), timeout=120)
 
 
-def values(proj, picks, slots, fpts, lineup):
+def rosters(P, picks):
+    """{roster_id: [(preseason pts per game, pos, pid), ...]} for the drafted players (keepers included)."""
+    out = {}
+    for p in picks:
+        q = P.get(p["player_id"]) or {}
+        out.setdefault(p["roster_id"], []).append((q.get("v", 0.0), q.get("pos") or (p.get("metadata") or {}).get("position") or "", p["player_id"]))
+    return out
+
+
+def player_values(proj, fpts):
     P = {}
     for e in proj:
         pid, s = e.get("player_id"), e.get("stats") or {}
@@ -25,6 +34,12 @@ def values(proj, picks, slots, fpts, lineup):
         pl = e.get("player") or {}
         P[pid] = dict(v=max(0.0, fpts(s)) / 17.0, pos=e.get("position") or pl.get("position") or "", adp=s.get("adp_half_ppr") or 999,
                       name=("%s %s" % (pl.get("first_name", ""), pl.get("last_name", ""))).strip())
+    return P
+
+
+def values(proj, picks, slots, fpts, lineup):
+    """(post-draft value - league mean, keeper surplus - league mean, keepers) by roster_id; also see rosters()."""
+    P = player_values(proj, fpts)
     rep = {}
     for q, n in REPL.items():
         vs = sorted((p["v"] for p in P.values() if p["pos"] == q), reverse=True)
@@ -37,13 +52,10 @@ def values(proj, picks, slots, fpts, lineup):
         return st.mean(p["vor"] for p in byadp[max(0, n - 4):min(len(byadp), n + 3)])
     rids = sorted({p["roster_id"] for p in picks})
     post, pre, keep = {}, {}, {}
+    cands = rosters(P, picks)
     for r in rids:
         mine = [p for p in picks if p["roster_id"] == r]
-        c = []
-        for p in mine:
-            q = P.get(p["player_id"]) or {}
-            c.append((q.get("v", 0.0), q.get("pos") or (p.get("metadata") or {}).get("position") or "", p["player_id"]))
-        post[r] = lineup(slots, c)[0]
+        post[r] = lineup(slots, cands[r])[0]
         ks = []
         for p in mine:
             if p.get("is_keeper"):
