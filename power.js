@@ -15,6 +15,51 @@ function rec(w,l,t){return w+"-"+l+(t?"-"+t:"")}
 function ord(n){return n+(n%100>10&&n%100<14?'th':['th','st','nd','rd'][n%10]||'th')}
 function ptTime(iso){try{return new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(iso))+" PT"}catch(e){return iso}}
 
+/* ---- odds over time (Power Rankings tab, and a compact copy at the top of the weekly report: opt.compact) */
+function oddsChart(D,opt){opt=opt||{};var cp=!!opt.compact,T=D.teams,h=[];
+if(!(D.hist&&D.hist.length>1))return "";
+var COL=["#1f77b4","#d62728","#2ca02c","#ff7f0e","#9467bd","#17becf","#8c564b","#e7298a","#222222","#a6a600","#7f7f7f","#00876c"],DASH=[0,0,0,0,0,0,"9 5","9 5","9 5","9 5","9 5","9 5"];
+window.powerOdds=function(b,k){var box=b.closest(".odds");box.setAttribute("data-k",k);[].forEach.call(box.querySelectorAll(".seg button"),function(x){x.setAttribute("aria-pressed",x===b)})};
+function oddsDim(box){var f=box.getAttribute("data-f")||"";box.classList.toggle("foc",!!f);[].forEach.call(box.querySelectorAll("[data-r]"),function(x){var m=f&&x.getAttribute("data-r")!==f;x.classList.toggle("dim",!!m);x.classList.toggle("on",!!f&&!m)})}
+window.powerFocus=function(el,rid){var box=el.closest(".odds"),on=box.getAttribute("data-f")===String(rid);box.setAttribute("data-f",on?"":String(rid));oddsDim(box)};
+var H=D.hist,n=H.length;
+function xl(h){return h.live?"W"+h.week+"*":h.week<0?"Pre-draft":h.week===0?"Pre":"W"+h.week}
+var SH=[[/^chuba/i,"Chuba"],[/independent/i,"Indep. Variable"],[/^hoosier/i,"Hoosier"],[/omarion/i,"Omarion"],[/^jahsif/i,"Jahsif"],[/^ka13/i,"KA13"],[/^cooked/i,"Cooked"],[/^buck/i,"Buck Love"],[/^lil bro/i,"Lil bro"],[/^robbie/i,"Robbie"],[/^ceedees/i,"CeeDees"],[/^marshawn/i,"Marshawn"]];
+function short(nm){for(var i=0;i<SH.length;i++)if(SH[i][0].test(nm))return SH[i][1];nm=String(nm).split(/\s+/)[0];return nm.length>12?nm.slice(0,11)+"\u2026":nm}
+function r0(v){return v>0&&v<0.5?"<1%":Math.round(v)+"%"}
+var order=T.slice().sort(function(a,b){return b.playoff-a.playoff||b.bye-a.bye}),ci={},cd={};order.forEach(function(t,i){ci[t.rid]=COL[i%COL.length];cd[t.rid]=DASH[i%DASH.length]});
+function svg(k,mob,cp){var W=mob?400:cp?1200:1000,Ht=mob?(cp?350:440):cp?330:430,fs=mob?(cp?12:11):14,lw=mob?(cp?140:126):172,ml=mob?34:44,mr=lw,mt=14,mb=mob?24:30,cw=W-ml-mr,ch=Ht-mt-mb,gap=Math.round(fs*1.4);
+function X(i){return ml+cw*i/(n-1)}function Y(v){return mt+ch*(1-v/100)}
+var g='<svg class="oc oc-'+k+'" viewBox="0 0 '+W+' '+Ht+'" style="font-size:'+fs+'px" role="img" aria-label="'+(k==="po"?"Playoff":"Bye")+' odds by week">';
+[0,25,50,75,100].forEach(function(v){g+='<line class="gl" x1="'+ml+'" x2="'+(W-mr)+'" y1="'+Y(v)+'" y2="'+Y(v)+'"/><text class="ax" x="'+(ml-6)+'" y="'+(Y(v)+4)+'" text-anchor="end">'+v+'%</text>'});
+H.forEach(function(h,i){var l=xl(h);g+='<text class="ax" x="'+X(i)+'" y="'+(Ht-8)+'" text-anchor="middle">'+(mob&&l.indexOf("-")>0?'<tspan x="'+X(i)+'" dy="-0.55em">'+l.split("-")[0]+'-</tspan><tspan x="'+X(i)+'" dy="1.1em">'+l.split("-")[1]+'</tspan>':l)+'</text>'});
+/* end labels with collision avoidance */
+var L=order.map(function(t){var y=Y(H[n-1][k][t.rid]);return{t:t,y0:y,y:y}}).sort(function(a,b){return a.y0-b.y0||b.t.playoff-a.t.playoff});
+var lo=mt+fs*0.4,hi=mt+ch;L.forEach(function(l,i){l.y=Math.max(l.y0,i?L[i-1].y+gap:lo)});
+for(var i=L.length-1;i>=0;i--){var mx=i===L.length-1?hi:L[i+1].y-gap;if(L[i].y>mx)L[i].y=mx}
+var ly={};L.forEach(function(l){ly[l.t.rid]=l});
+order.slice().reverse().forEach(function(t){var pts=H.map(function(h,i){return X(i).toFixed(1)+","+Y(h[k][t.rid]).toFixed(1)}).join(" "),l=ly[t.rid],xe=X(n-1),lx=xe+(mob?18:34);
+g+='<g data-r="'+t.rid+'" style="color:'+ci[t.rid]+'" onclick="powerFocus(this,'+t.rid+')"><polyline class="ln" points="'+pts+'"'+(cd[t.rid]?' stroke-dasharray="'+cd[t.rid]+'"':'')+'/><polyline class="hit" points="'+pts+'"><title>'+esc(t.name)+'</title></polyline>';
+H.forEach(function(h,i){g+='<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(h[k][t.rid]).toFixed(1)+'"><title>'+esc(t.name)+', '+xl(h)+': '+pc(h[k][t.rid])+'</title></circle>'});
+g+='<path class="ld" d="M'+(xe+5)+' '+l.y0.toFixed(1)+'L'+(lx-4)+' '+l.y.toFixed(1)+'"/><text class="lb" x="'+lx+'" y="'+(l.y+fs*0.36).toFixed(1)+'">'+esc(short(t.name))+' <tspan class="lv">'+r0(H[n-1][k][t.rid])+'</tspan><title>'+esc(t.name)+'</title></text></g>'});
+return g+'</svg>'}
+window.powerOddsBuild=function(mob,cp){return svg("po",mob,cp)+svg("bye",mob,cp)};
+function isMob(){return (window.innerWidth||1000)<700}
+if(!window.__oddsRz){window.__oddsRz=1;window.addEventListener("resize",function(){var m=isMob();[].forEach.call(document.querySelectorAll(".odds .ocw"),function(w){if(w.getAttribute("data-m")!==String(m)&&window.powerOddsBuild){w.setAttribute("data-m",String(m));w.innerHTML=window.powerOddsBuild(m,w.getAttribute("data-c")==="1");oddsDim(w.closest(".odds"))}})})}
+var hz=D.inj_hazard||{};
+if(cp)h.push('<section class="odds repodds" data-k="po"><h2>Playoff odds through the season</h2><p class="cap">Each point is the Power Rankings simulation rerun with only what was known after that week (W'+D.cur+'* = now). Tap a team to spotlight it'+(opt.link?'; method on the <a href="'+esc(opt.link)+'">Power Rankings</a> tab':'')+'.</p>');
+else h.push('<section class="odds" data-k="po"><h2>Odds through the season</h2><ul class="meth">'+
+'<li><b>Pre-draft:</b> everyone starts level; keepers add how much better they are than what their pick usually gets.</li>'+
+'<li><b>After the draft:</b> each drafted roster\u2019s projected value, but only '+D.beta0+' of its edge over average counts (how much draft edges held up in Best League 2022\u201325).</li>'+
+'<li><b>Each week:</b> real points per game blend in with projections, and the roster edge is trusted more ('+D.beta_now+' now).</li>'+
+'<li><b>Rest of season:</b> simulated '+D.sims.toLocaleString("en-US")+' times; every score varies by \u00b1'+f1(D.sd_noise)+' pts, plus a hidden boost or drag per team (\u00b1'+f1(D.tau_now)+' now).</li>'+
+'<li><b>Injuries:</b> in each simulated week a healthy player can start missing games (about '+Math.round(100*(hz.RB||0))+'% chance per game at QB/RB/WR/TE, from Sleeper game logs 2021\u201325) for 1 game up to the rest of the season; the best lineup re-forms from the bench or waivers, so depth matters.</li></ul><p class="cap">Each point reruns the simulation with only what was known after that week. Pre-draft = keepers only; Pre = after the draft; W'+D.cur+'* = now (week '+D.cur+' in progress). Hover or tap a team to spotlight it.</p>');
+h.push('<div class="seg"><button type="button" aria-pressed="true" onclick="powerOdds(this,\'po\')">Playoff %</button><button type="button" aria-pressed="false" onclick="powerOdds(this,\'bye\')">Bye %</button></div>');
+h.push('<div class="ocw" data-m="'+isMob()+'" data-c="'+(cp?1:0)+'">'+window.powerOddsBuild(isMob(),cp)+'</div><div class="ol">');
+order.forEach(function(t){h.push('<button type="button" data-r="'+t.rid+'" onclick="powerFocus(this,'+t.rid+')"><svg width="26" height="8"><line x1="1" y1="4" x2="25" y2="4" stroke="'+ci[t.rid]+'" stroke-width="4"'+(cd[t.rid]?' stroke-dasharray="7 3"':'')+'/></svg>'+esc(short(t.name))+' <b class="v-po">'+r0(t.playoff)+'</b><b class="v-bye">'+r0(t.bye)+'</b></button>')});
+h.push('</div></section>')
+return h.join("")}
+window.buildPowerOdds=function(D,opt){return D?oddsChart(D,opt):""};
 /* Ben's (podcast co-host) rankings, keyed by Sleeper roster_id */
 var BEN={4:1,10:2,2:3,8:4,11:5,12:6,6:7,1:8,3:9,5:10,9:11,7:12};
 window.buildPower=function(D){
@@ -56,47 +101,7 @@ h.push('<div class="scroll"><table><thead><tr><th>Rank</th><th>Ben\u2019s rank</
 T.forEach(function(t,i){h.push('<tr><td>'+t.rank+'</td><td>'+(BEN[t.rid]||'\u2013')+'</td><td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+f1(t.pf)+'</td><td>'+pill(f1(t.strength),tS[i])+'</td><td>'+pr(t)+'</td><td>'+pill(pc(t.playoff),ptier(t.playoff,67,33))+'</td><td>'+pill(pc(t.first),ptier(t.first,20,5))+'</td><td>'+pill(pc(t.title),ptier(t.title,15,5))+'</td><td class="nt">'+note(t)+'</td></tr>')});
 h.push('</tbody></table></div></section>');
 
-/* ---- odds over time */
-var COL=["#1f77b4","#d62728","#2ca02c","#ff7f0e","#9467bd","#17becf","#8c564b","#e7298a","#222222","#a6a600","#7f7f7f","#00876c"],DASH=[0,0,0,0,0,0,"9 5","9 5","9 5","9 5","9 5","9 5"];
-window.powerOdds=function(b,k){var box=b.closest(".odds");box.setAttribute("data-k",k);[].forEach.call(box.querySelectorAll(".seg button"),function(x){x.setAttribute("aria-pressed",x===b)})};
-function oddsDim(box){var f=box.getAttribute("data-f")||"";box.classList.toggle("foc",!!f);[].forEach.call(box.querySelectorAll("[data-r]"),function(x){var m=f&&x.getAttribute("data-r")!==f;x.classList.toggle("dim",!!m);x.classList.toggle("on",!!f&&!m)})}
-window.powerFocus=function(el,rid){var box=el.closest(".odds"),on=box.getAttribute("data-f")===String(rid);box.setAttribute("data-f",on?"":String(rid));oddsDim(box)};
-if(D.hist&&D.hist.length>1){
-var H=D.hist,n=H.length;
-function xl(h){return h.live?"W"+h.week+"*":h.week<0?"Pre-draft":h.week===0?"Pre":"W"+h.week}
-var SH=[[/^chuba/i,"Chuba"],[/independent/i,"Indep. Variable"],[/^hoosier/i,"Hoosier"],[/omarion/i,"Omarion"],[/^jahsif/i,"Jahsif"],[/^ka13/i,"KA13"],[/^cooked/i,"Cooked"],[/^buck/i,"Buck Love"],[/^lil bro/i,"Lil bro"],[/^robbie/i,"Robbie"],[/^ceedees/i,"CeeDees"],[/^marshawn/i,"Marshawn"]];
-function short(nm){for(var i=0;i<SH.length;i++)if(SH[i][0].test(nm))return SH[i][1];nm=String(nm).split(/\s+/)[0];return nm.length>12?nm.slice(0,11)+"\u2026":nm}
-function r0(v){return v>0&&v<0.5?"<1%":Math.round(v)+"%"}
-var order=T.slice().sort(function(a,b){return b.playoff-a.playoff||b.bye-a.bye}),ci={},cd={};order.forEach(function(t,i){ci[t.rid]=COL[i%COL.length];cd[t.rid]=DASH[i%DASH.length]});
-function svg(k,mob){var W=mob?400:1000,Ht=mob?440:430,fs=mob?11:14,lw=mob?126:172,ml=mob?34:44,mr=lw,mt=14,mb=mob?24:30,cw=W-ml-mr,ch=Ht-mt-mb,gap=Math.round(fs*1.4);
-function X(i){return ml+cw*i/(n-1)}function Y(v){return mt+ch*(1-v/100)}
-var g='<svg class="oc oc-'+k+'" viewBox="0 0 '+W+' '+Ht+'" style="font-size:'+fs+'px" role="img" aria-label="'+(k==="po"?"Playoff":"Bye")+' odds by week">';
-[0,25,50,75,100].forEach(function(v){g+='<line class="gl" x1="'+ml+'" x2="'+(W-mr)+'" y1="'+Y(v)+'" y2="'+Y(v)+'"/><text class="ax" x="'+(ml-6)+'" y="'+(Y(v)+4)+'" text-anchor="end">'+v+'%</text>'});
-H.forEach(function(h,i){var l=xl(h);g+='<text class="ax" x="'+X(i)+'" y="'+(Ht-8)+'" text-anchor="middle">'+(mob&&l.indexOf("-")>0?'<tspan x="'+X(i)+'" dy="-0.55em">'+l.split("-")[0]+'-</tspan><tspan x="'+X(i)+'" dy="1.1em">'+l.split("-")[1]+'</tspan>':l)+'</text>'});
-/* end labels with collision avoidance */
-var L=order.map(function(t){var y=Y(H[n-1][k][t.rid]);return{t:t,y0:y,y:y}}).sort(function(a,b){return a.y0-b.y0||b.t.playoff-a.t.playoff});
-var lo=mt+fs*0.4,hi=mt+ch;L.forEach(function(l,i){l.y=Math.max(l.y0,i?L[i-1].y+gap:lo)});
-for(var i=L.length-1;i>=0;i--){var mx=i===L.length-1?hi:L[i+1].y-gap;if(L[i].y>mx)L[i].y=mx}
-var ly={};L.forEach(function(l){ly[l.t.rid]=l});
-order.slice().reverse().forEach(function(t){var pts=H.map(function(h,i){return X(i).toFixed(1)+","+Y(h[k][t.rid]).toFixed(1)}).join(" "),l=ly[t.rid],xe=X(n-1),lx=xe+(mob?18:34);
-g+='<g data-r="'+t.rid+'" style="color:'+ci[t.rid]+'" onclick="powerFocus(this,'+t.rid+')"><polyline class="ln" points="'+pts+'"'+(cd[t.rid]?' stroke-dasharray="'+cd[t.rid]+'"':'')+'/><polyline class="hit" points="'+pts+'"><title>'+esc(t.name)+'</title></polyline>';
-H.forEach(function(h,i){g+='<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(h[k][t.rid]).toFixed(1)+'"><title>'+esc(t.name)+', '+xl(h)+': '+pc(h[k][t.rid])+'</title></circle>'});
-g+='<path class="ld" d="M'+(xe+5)+' '+l.y0.toFixed(1)+'L'+(lx-4)+' '+l.y.toFixed(1)+'"/><text class="lb" x="'+lx+'" y="'+(l.y+fs*0.36).toFixed(1)+'">'+esc(short(t.name))+' <tspan class="lv">'+r0(H[n-1][k][t.rid])+'</tspan><title>'+esc(t.name)+'</title></text></g>'});
-return g+'</svg>'}
-window.powerOddsBuild=function(mob){return svg("po",mob)+svg("bye",mob)};
-function isMob(){return (window.innerWidth||1000)<700}
-if(!window.__oddsRz){window.__oddsRz=1;window.addEventListener("resize",function(){var m=isMob();[].forEach.call(document.querySelectorAll(".odds .ocw"),function(w){if(w.getAttribute("data-m")!==String(m)&&window.powerOddsBuild){w.setAttribute("data-m",String(m));w.innerHTML=window.powerOddsBuild(m);oddsDim(w.closest(".odds"))}})})}
-var hz=D.inj_hazard||{};
-h.push('<section class="odds" data-k="po"><h2>Odds through the season</h2><ul class="meth">'+
-'<li><b>Pre-draft:</b> everyone starts level; keepers add how much better they are than what their pick usually gets.</li>'+
-'<li><b>After the draft:</b> each drafted roster\u2019s projected value, but only '+D.beta0+' of its edge over average counts (how much draft edges held up in Best League 2022\u201325).</li>'+
-'<li><b>Each week:</b> real points per game blend in with projections, and the roster edge is trusted more ('+D.beta_now+' now).</li>'+
-'<li><b>Rest of season:</b> simulated '+D.sims.toLocaleString("en-US")+' times; every score varies by \u00b1'+f1(D.sd_noise)+' pts, plus a hidden boost or drag per team (\u00b1'+f1(D.tau_now)+' now).</li>'+
-'<li><b>Injuries:</b> in each simulated week a healthy player can start missing games (about '+Math.round(100*(hz.RB||0))+'% chance per game at QB/RB/WR/TE, from Sleeper game logs 2021\u201325) for 1 game up to the rest of the season; the best lineup re-forms from the bench or waivers, so depth matters.</li></ul><p class="cap">Each point reruns the simulation with only what was known after that week. Pre-draft = keepers only; Pre = after the draft; W'+D.cur+'* = now (week '+D.cur+' in progress). Hover or tap a team to spotlight it.</p>');
-h.push('<div class="seg"><button type="button" aria-pressed="true" onclick="powerOdds(this,\'po\')">Playoff %</button><button type="button" aria-pressed="false" onclick="powerOdds(this,\'bye\')">Bye %</button></div>');
-h.push('<div class="ocw" data-m="'+isMob()+'">'+window.powerOddsBuild(isMob())+'</div><div class="ol">');
-order.forEach(function(t){h.push('<button type="button" data-r="'+t.rid+'" onclick="powerFocus(this,'+t.rid+')"><svg width="26" height="8"><line x1="1" y1="4" x2="25" y2="4" stroke="'+ci[t.rid]+'" stroke-width="4"'+(cd[t.rid]?' stroke-dasharray="7 3"':'')+'/></svg>'+esc(short(t.name))+' <b class="v-po">'+r0(t.playoff)+'</b><b class="v-bye">'+r0(t.bye)+'</b></button>')});
-h.push('</div></section>')}
+h.push(oddsChart(D));
 
 /* ---- projected finish */
 h.push('<section><h2>Projected finish</h2><p class="cap">Where each team finished across the simulations. The number is the average final standing.</p>');

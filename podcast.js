@@ -111,6 +111,9 @@ if(box)box.innerHTML=D?build(D):'<p class="cap">Podcast data is missing.</p>';
 var PD=window.POWER&&window.POWER[key],pbox=document.getElementById(key+"-power");
 if(pbox)pbox.innerHTML=PD&&window.buildPower?window.buildPower(PD):'<p class="cap">Power rankings data is missing.</p>';
 var H=opt.hashes||{podcast:opt.podHash};
+/* compact playoff-odds chart at the top of the weekly report (same data as the Power Rankings tab) */
+var rc=document.getElementById(key+"-repchart");
+if(rc){rc.innerHTML=PD&&window.buildPowerOdds?window.buildPowerOdds(PD,{compact:true,link:H.power}):"";rc.hidden=!rc.innerHTML}
 var btns=document.querySelectorAll('#'+key+'-subtabs button'),V=[];
 for(var i=0;i<btns.length;i++)V.push(btns[i].getAttribute("data-v"));
 function set(v,push){if(V.indexOf(v)<0)v="report";
