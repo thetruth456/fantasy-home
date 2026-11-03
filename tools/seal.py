@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Encrypt the site's data files so the public repo and site hold only ciphertext.
 
-Every data file (*-report.js, best-podcast-data.js, best-power-data.js) is written as
+Every weekly report data file (*-report.js: rosters, lineups, waivers) is written as
+(the podcast luck / power rankings files stay plaintext and public on purpose)
     window.LOCKED["REPORTS.best"] = {"v":1, "ks":..., "iter":..., "salt":..., "iv":..., "ct":...}
   * password -> PBKDF2-SHA256 (ITER iterations, salt "ks" from tools/lock.json) -> 256-bit master key
   * master key + a fresh random 16-byte salt per file and write -> HKDF-SHA256 -> AES-256-GCM key
@@ -12,8 +13,8 @@ tools/lock.json holds only the public PBKDF2 salt and an encrypted check value, 
 The password comes from env FH_REPORT_PASSWORD (in the Action: the repository secret of the same name).
 Fail closed: without it, or if it does not match tools/lock.json, nothing is written.
 
-  python tools/seal.py verify          exit 1 if any data file is plaintext (no password needed)
-  python tools/seal.py check           check FH_REPORT_PASSWORD against tools/lock.json and decrypt every data file
+  python tools/seal.py verify          exit 1 if any report data file is plaintext (no password needed)
+  python tools/seal.py check           check FH_REPORT_PASSWORD against tools/lock.json and decrypt every report data file
   python tools/seal.py init            new tools/lock.json for FH_REPORT_PASSWORD, then (re)encrypt every data file
                                         (already-encrypted files need the old password in FH_REPORT_PASSWORD_OLD)
 """
@@ -34,14 +35,13 @@ LOCK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lock.json")
 ITER = 600000
 INFO = b"fh-seal-v1"
 ENV = "FH_REPORT_PASSWORD"
-# data file -> slot (window.<NS>.<key>)
+# data file -> slot (window.<NS>.<key>). Only the weekly reports (rosters, lineups, waivers) are locked;
+# the podcast luck / power rankings files (best-podcast-data.js, best-power-data.js) stay public on purpose.
 FILES = {
     "best-league-report.js": "REPORTS.best",
     "zbt-report.js": "REPORTS.zbt",
     "oopsilons-report.js": "REPORTS.oops",
     "spacex-report.js": "REPORTS.spacex",
-    "best-podcast-data.js": "PODCAST.best",
-    "best-power-data.js": "POWER.best",
 }
 HEAD = "/* Encrypted data file (tools/seal.py). Unlocked in the browser by lock.js. */\nwindow.LOCKED=window.LOCKED||{};\n"
 _RX = re.compile(r'window\.LOCKED\["([A-Z]+\.\w+)"\]=(\{.*\});?\s*$', re.S)

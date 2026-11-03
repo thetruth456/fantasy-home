@@ -126,12 +126,12 @@ td.tw{white-space:normal;min-width:190px;max-width:360px}.inj{color:var(--mut);f
 
 .odds .seg{margin:2px 0 8px}.ocw{width:100%}.oc{width:100%;height:auto;display:block;font-family:inherit}.odds[data-k=po] .oc-bye,.odds[data-k=bye] .oc-po,.odds[data-k=po] .v-bye,.odds[data-k=bye] .v-po{display:none}.oc .gl{stroke:var(--line);stroke-width:1}.oc .ax{fill:var(--mut)}.oc .ln{fill:none;stroke:currentColor;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}.oc .hit{fill:none;stroke:transparent;stroke-width:14;pointer-events:stroke}.oc circle{fill:currentColor;stroke:#fff;stroke-width:1.5;r:4.5}.oc .ld{fill:none;stroke:currentColor;stroke-width:1.2;opacity:.7}.oc .lb{fill:currentColor;font-weight:700}.oc .lv{font-weight:500}.oc g[data-r]{cursor:pointer;transition:opacity .15s}.oc:has(g[data-r]:hover) g[data-r]:not(:hover){opacity:.15}.odds.foc .oc g.dim{opacity:.1}.odds.foc .oc g.on{opacity:1}.oc g[data-r]:hover .ln,.oc g.on .ln{stroke-width:5}.ol{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;margin:10px 0 0}.ol button{display:flex;align-items:center;gap:7px;background:none;border:1px solid var(--line);border-radius:8px;padding:5px 8px;font:inherit;font-size:13px;color:inherit;cursor:pointer;text-align:left}.ol button b{margin-left:auto;font-weight:600}.ol button.dim{opacity:.35}.ol button.on{border-color:currentColor;font-weight:700}
 @media(max-width:600px){.ol{grid-template-columns:1fr 1fr}.ol button{font-size:12px;padding:4px 6px}.oc .ln{stroke-width:2.6}.oc circle{r:3.4}}
-/* password gate (lock.js) */
-.locked .wrap,.locked footer,.locked .refresh,.locked .tabs,.locked .token-panel{display:none}
-.lock[hidden]{display:none}
-.lock{max-width:420px;margin:48px auto;padding:0 16px}
+/* password gate for the weekly report views (lock.js); podcast tabs stay open */
+.rlocked .refresh,.rlocked .token-panel,.rlocked .rep>:not(.lock):not(.back):not(.subtabs){display:none}
+.lock[hidden]{display:none}.lock.checking{visibility:hidden}
+.lock{max-width:420px;margin:28px auto 40px;padding:0 4px}
 .lockcard{display:flex;flex-direction:column;gap:10px;background:var(--card);border:1px solid var(--line);border-top:5px solid var(--gold);border-radius:12px;padding:22px 20px;box-shadow:0 2px 10px rgba(20,40,30,.08)}
-.lockcard h1{font-size:22px;margin:0;color:var(--ink)}
+.lockcard h2{font-size:21px;margin:0;color:var(--ink);border:0;padding:0}
 .lockcard .cap{margin:0}
 .lockcard input[type=password]{font:inherit;font-size:16px;padding:9px 12px;border:1px solid #9bc2ab;border-radius:8px}
 .lockrem{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--mut)}

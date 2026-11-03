@@ -8,13 +8,13 @@
 <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="style.css">
-</head><body class="theme-best locked" id="body">
+</head><body class="theme-best" id="body">
 <header class="site"><div class="in"><a class="brand" href="index.html"><img src="favicon.svg" alt="" width="30" height="30"><span>Fantasy <b>home base</b></span></a><nav class="tabs" role="tablist" aria-label="Leagues"><button type="button" role="tab" data-p="best" class="theme-best" data-theme="theme-best" aria-selected="true" aria-controls="p-best">Best League</button><button type="button" role="tab" data-p="zbt" class="theme-zbt" data-theme="theme-zbt" aria-selected="false" aria-controls="p-zbt">ZBT</button><button type="button" role="tab" data-p="oops" class="theme-oops" data-theme="theme-oops" aria-selected="false" aria-controls="p-oops">Oopsilons</button><button type="button" role="tab" data-p="spacex" class="theme-spacex" data-theme="theme-spacex" aria-selected="false" aria-controls="p-spacex">SpaceX FF</button></nav><div class="refresh"><div class="rbtns"><button type="button" id="full-btn" class="refresh-btn full" title="Re-pulls everything (rosters, projections, props, FantasyPros) through GitHub Actions"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3v9m0 0 3.5-3.5M12 12 8.5 8.5M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lbl">Refresh everything</span></button></div><span id="refresh-status" class="refresh-status" role="status" aria-live="polite">Updates automatically: hourly Sat 1 PM to Sun 10 AM PT, daily otherwise</span><button type="button" id="token-clear" class="linkbtn" hidden>Forget GitHub token</button><button type="button" id="lock-btn" class="linkbtn" hidden title="Lock the reports and forget this device">Lock</button></div></div><div id="token-panel" class="token-panel" hidden><div class="tin"><strong>One-time setup for “Refresh everything”</strong><ol><li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub: new fine-grained token</a>, name it anything and pick an expiry.</li><li>Repository access: <b>Only select repositories</b>, then <b>fantasy-home</b>.</li><li>Permissions, Repository permissions: <b>Actions: Read and write</b>. Nothing else. Click Generate token.</li><li>Paste the token below. It is saved only in this browser (localStorage), never in the repo.</li></ol><form id="token-form" autocomplete="off"><input type="password" id="token-input" placeholder="github_pat_…" aria-label="GitHub token" autocomplete="off" spellcheck="false"><button type="submit" class="refresh-btn">Save and refresh</button><button type="button" id="token-cancel" class="linkbtn">Cancel</button></form><p id="token-msg" class="token-msg" role="alert"></p></div></div></header>
-<div id="lock" class="lock"><noscript><p class="lockcard">The reports need JavaScript to unlock.</p></noscript></div>
 <div class="wrap">
 <div class="panel theme-best" id="p-best" role="tabpanel">
 <div class="subtabs" id="best-subtabs" role="tablist" aria-label="Best League views"><button type="button" role="tab" data-v="report" aria-selected="true">Weekly report</button><button type="button" role="tab" data-v="podcast" aria-selected="false">Podcast: luck report</button><button type="button" role="tab" data-v="power" aria-selected="false">Podcast: Power Rankings</button></div>
-<div class="view" id="best-view-report">
+<div class="view rep" id="best-view-report">
+<div class="lock"><noscript><p class="lockcard">The weekly report needs JavaScript to unlock.</p></noscript></div>
 <p class="weekline">Weekly snapshots: <a href="best-league.html" id="best-week">Latest week</a> <span class="sep">|</span> <a href="best-league.html">Standalone page</a></p>
 <h1 id="best-title"></h1>
 <p class="asof" id="best-asof"></p>
@@ -50,7 +50,8 @@
 </div>
 <div class="view" id="best-view-podcast" hidden><div id="best-podcast"></div></div>
 <div class="view" id="best-view-power" hidden><div id="best-power"></div></div></div>
-<div class="panel theme-zbt" id="p-zbt" role="tabpanel" hidden>
+<div class="panel rep theme-zbt" id="p-zbt" role="tabpanel" hidden>
+<div class="lock"><noscript><p class="lockcard">The weekly report needs JavaScript to unlock.</p></noscript></div>
 <p class="weekline">Weekly snapshots: <a href="zbt.html" id="zbt-week">Latest week</a> <span class="sep">|</span> <a href="zbt.html">Standalone page</a></p>
 <h1 id="zbt-title"></h1>
 <p class="asof" id="zbt-asof"></p>
@@ -83,7 +84,8 @@
 
 <section id="zbt-data-notes"><h2>Data notes and sources</h2>
 <ul id="zbt-notes"></ul></section></div>
-<div class="panel theme-oops" id="p-oops" role="tabpanel" hidden>
+<div class="panel rep theme-oops" id="p-oops" role="tabpanel" hidden>
+<div class="lock"><noscript><p class="lockcard">The weekly report needs JavaScript to unlock.</p></noscript></div>
 <p class="weekline">Weekly snapshots: <a href="oopsilons.html" id="oops-week">Latest week</a> <span class="sep">|</span> <a href="oopsilons.html">Standalone page</a></p>
 <h1 id="oops-title"></h1>
 <p class="asof" id="oops-asof"></p>
@@ -116,7 +118,8 @@
 
 <section id="oops-data-notes"><h2>Data notes and sources</h2>
 <ul id="oops-notes"></ul></section></div>
-<div class="panel theme-spacex" id="p-spacex" role="tabpanel" hidden>
+<div class="panel rep theme-spacex" id="p-spacex" role="tabpanel" hidden>
+<div class="lock"><noscript><p class="lockcard">The weekly report needs JavaScript to unlock.</p></noscript></div>
 <p class="weekline">Weekly snapshots: <a href="spacex-ff.html" id="spacex-week">Latest week</a> <span class="sep">|</span> <a href="spacex-ff.html">Standalone page</a></p>
 <h1 id="spacex-title"></h1>
 <p class="asof" id="spacex-asof"></p>
@@ -163,21 +166,21 @@
 <script src="best-power-data.js"></script>
 <script src="power.js"></script>
 <script>
-fhLock(function(){
+(function(){
 var ids=["best","zbt","oops","spacex"];
-ids.forEach(function(k){initReport(k)});
+fhLock(function(){ids.forEach(function(k){initReport(k)})});
 initPodcast("best",{hashes:{podcast:"#best-podcast",power:"#best-power"},repHash:"#best"});
 var tabs=document.querySelectorAll(".tabs button");
 function show(id){var sub="report";if(id==="best-podcast"||id==="best-power"){sub=id.slice(5);id="best"}if(ids.indexOf(id)<0)id="best";
 for(var i=0;i<ids.length;i++){document.getElementById("p-"+ids[i]).hidden=ids[i]!==id}
 var th="theme-best";
 for(var j=0;j<tabs.length;j++){var on=tabs[j].getAttribute("data-p")===id;tabs[j].setAttribute("aria-selected",on);if(on)th=tabs[j].getAttribute("data-theme")}
-document.body.className=th;
+document.body.className=th+(document.body.classList.contains("rlocked")?" rlocked":"");
 if(id==="best"&&window.set_best_view)set_best_view(sub);
 if(history.replaceState)history.replaceState(null,"","#"+(id==="best"&&sub!=="report"?"best-"+sub:id))}
 for(var k=0;k<tabs.length;k++){tabs[k].onclick=function(){show(this.getAttribute("data-p"))}}
 window.addEventListener("hashchange",function(){show(location.hash.replace("#",""))});
 show(location.hash.replace("#",""));
-});
+})();
 </script>
 </body></html>

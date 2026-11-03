@@ -1,6 +1,7 @@
-/* Password gate for the encrypted data files (tools/seal.py writes them; this decrypts them with WebCrypto).
+/* Password gate for the encrypted weekly report data files (tools/seal.py writes them; this decrypts them with WebCrypto).
    password -> PBKDF2-SHA256 (salt "ks", "iter" from the file) -> master key; per file: HKDF-SHA256(master, file salt) -> AES-256-GCM.
-   "Remember on this device" stores the master key (not the password) in localStorage. Pages call fhLock(start). */
+   "Remember on this device" stores the master key (not the password) in localStorage. Pages call fhLock(start).
+   Only the weekly report data (*-report.js) is encrypted; the podcast luck / power rankings data is public. */
 (function(){
 var LS="fh_report_key_v1",MK=null,KS=null;
 function u8(b64){var s=atob(b64),a=new Uint8Array(s.length);for(var i=0;i<s.length;i++)a[i]=s.charCodeAt(i);return a}
@@ -22,27 +23,33 @@ if(!m)return Promise.reject(new Error("unexpected data file"));if(!MK)return Pro
 return openBlob(MK,m[1],JSON.parse(m[2]))};
 window.fhForget=function(){try{localStorage.removeItem(LS)}catch(e){}};
 function saved(){try{var v=JSON.parse(localStorage.getItem(LS)||"null");return v&&v.ks===KS?u8(v.k):null}catch(e){return null}}
+/* fhLock(start): only the weekly report views (.rep) are locked. Each .rep gets an inline password card; the rest of
+   the page (podcast luck / power tabs) works without a password. start() runs after unlocking (draws the reports). */
 window.fhLock=function(start){
-var L=window.LOCKED||{},slots=Object.keys(L),box=document.getElementById("lock");
-function done(){document.body.classList.remove("locked");if(box)box.hidden=true;
+var L=window.LOCKED||{},slots=Object.keys(L),reps=document.querySelectorAll(".rep"),body=document.body;
+body.classList.add("rlocked");
+function each(f){for(var i=0;i<reps.length;i++)f(reps[i],i)}
+function card(html){each(function(r){var c=r.querySelector(":scope>.lock");if(!c){c=document.createElement("div");c.className="lock";r.insertBefore(c,r.firstChild)}c.innerHTML=html;c.hidden=false})}
+function done(){body.classList.remove("rlocked");each(function(r){var c=r.querySelector(":scope>.lock");if(c)c.hidden=true});
 var hb=document.getElementById("lock-btn");if(hb){hb.hidden=false;hb.onclick=function(){window.fhForget();location.reload()}}
 start()}
-if(!slots.length){if(box)box.innerHTML='<div class="lockcard"><p>Report data is missing.</p></div>';return}
-if(!C){box.innerHTML='<div class="lockcard"><p>This browser can\u2019t decrypt the report (needs HTTPS and WebCrypto).</p></div>';return}
+if(!slots.length){card('<div class="lockcard"><p>Report data is missing.</p></div>');return}
+if(!C){card('<div class="lockcard"><p>This browser can\u2019t decrypt the report (needs HTTPS and WebCrypto).</p></div>');return}
 KS=L[slots[0]].ks;
-box.innerHTML='<form class="lockcard" id="lock-form" autocomplete="on"><h1>Reports are locked</h1><p class="cap">Enter the password to open the weekly reports.</p>'+
+card('<form class="lockcard lock-form" autocomplete="on"><h2>Weekly report is locked</h2><p class="cap">Enter the password to open the weekly reports. The podcast tabs don\u2019t need it.</p>'+
 '<input type="text" name="username" value="fantasy-home" autocomplete="username" hidden>'+
-'<input type="password" id="lock-pw" autocomplete="current-password" aria-label="Password" placeholder="Password" required>'+
-'<label class="lockrem"><input type="checkbox" id="lock-rem"> Remember on this device</label>'+
-'<button type="submit" class="refresh-btn" id="lock-go">Unlock</button><p class="lockmsg" id="lock-msg" role="alert"></p></form>';
-var form=document.getElementById("lock-form"),pw=document.getElementById("lock-pw"),msg=document.getElementById("lock-msg"),go=document.getElementById("lock-go");
+'<input type="password" class="lock-pw" autocomplete="current-password" aria-label="Password" placeholder="Password" required>'+
+'<label class="lockrem"><input type="checkbox" class="lock-rem"> Remember on this device</label>'+
+'<button type="submit" class="refresh-btn lock-go">Unlock</button><p class="lockmsg" role="alert"></p></form>');
+function busyAll(on){each(function(r){var c=r.querySelector(":scope>.lock");if(c)c.classList.toggle("checking",on)})}
 var mk=saved();
-if(mk){box.hidden=true;openAll(mk).then(function(){MK=mk;done()},function(){window.fhForget();box.hidden=false;pw.focus()})}
-else pw.focus();
+if(mk){busyAll(true);openAll(mk).then(function(){MK=mk;done()},function(){window.fhForget();busyAll(false)})}
+each(function(r){var form=r.querySelector(".lock-form");if(!form)return;
+var pw=form.querySelector(".lock-pw"),msg=form.querySelector(".lockmsg"),go=form.querySelector(".lock-go");
 form.addEventListener("submit",function(ev){ev.preventDefault();if(!pw.value)return;
 go.disabled=true;go.textContent="Unlocking\u2026";msg.textContent="";
 master(pw.value,KS,L[slots[0]].iter).then(function(k){return openAll(k).then(function(){return k})})
 .then(function(k){MK=k;pw.value="";
-if(document.getElementById("lock-rem").checked){try{localStorage.setItem(LS,JSON.stringify({ks:KS,k:b64(k)}))}catch(e){}}
-done()},function(){msg.textContent="Wrong password. Try again.";pw.select();go.disabled=false;go.textContent="Unlock"})})};
+if(form.querySelector(".lock-rem").checked){try{localStorage.setItem(LS,JSON.stringify({ks:KS,k:b64(k)}))}catch(e){}}
+done()},function(){msg.textContent="Wrong password. Try again.";pw.select();go.disabled=false;go.textContent="Unlock"})})})};
 })();

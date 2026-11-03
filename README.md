@@ -73,13 +73,13 @@ Power rankings work the same way: `python tools/power.py [sims]` writes `best-po
 
 ## Password lock (encrypted data)
 
-The weekly reports and the Best League podcast tabs are behind a password. Every data file (`*-report.js`, `best-podcast-data.js`, `best-power-data.js`) holds only ciphertext; `lock.js` asks for the password and decrypts in the browser (WebCrypto).
+Only the weekly reports (rosters, lineups, waivers) are behind a password. The weekly report data files (`*-report.js`) hold only ciphertext; `lock.js` shows a password prompt inside the Weekly report view and decrypts in the browser (WebCrypto). The Best League podcast tabs (luck report, Power Rankings) stay open to everyone: `best-podcast-data.js` and `best-power-data.js` are plaintext on purpose, and deep links like `index.html#best-power` open with no prompt. Refresh everything and the token panel only appear after unlocking.
 
 * Crypto (`tools/seal.py`): password -> PBKDF2-SHA256 (600,000 iterations, public salt in `tools/lock.json`) -> master key; each file and each write gets a fresh random salt (HKDF-SHA256 -> AES-256-GCM key) and a fresh random IV. `tools/lock.json` also holds an encrypted check value, so a wrong password fails the build instead of writing files nobody can open.
-* The password is read from env `FH_REPORT_PASSWORD` (the Action uses the repository secret of the same name). Without it, `tools/update.py`, `tools/podcast.py` and `tools/power.py` exit with an error and write nothing. The workflow also runs `python tools/seal.py verify` before committing.
+* The password is read from env `FH_REPORT_PASSWORD` (the Action uses the repository secret of the same name). Without it, `tools/update.py` exits with an error and writes nothing (`tools/podcast.py` and `tools/power.py` don't need it). The workflow also runs `python tools/seal.py verify` before committing.
 * "Remember on this device" stores the derived master key (not the password) in localStorage; the **Lock** link in the header forgets it.
-* Change the password: `FH_REPORT_PASSWORD_OLD=<old> FH_REPORT_PASSWORD=<new> python tools/seal.py init`, commit `tools/lock.json` and the data files, and update the secret.
-* `python tools/seal.py check` confirms the password and that every data file decrypts. Needs `pip install cryptography`.
+* Change the password: `FH_REPORT_PASSWORD_OLD=<old> FH_REPORT_PASSWORD=<new> python tools/seal.py init`, commit `tools/lock.json` and the `*-report.js` files, and update the secret.
+* `python tools/seal.py check` confirms the password and that every report data file decrypts. Needs `pip install cryptography`.
 * Git history from before the lock still has plaintext data files.
 
 ## Pages and files
