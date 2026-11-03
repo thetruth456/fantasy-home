@@ -61,6 +61,13 @@ def sleeper_scores(season, week):
     return d if isinstance(d, list) else []
 
 
+def week_final(season, week):
+    """True once every NFL game of that regular-season week is final in Sleeper's scores feed
+    (Sleeper's league last_scored_leg only moves the next morning)."""
+    g = sleeper_scores(season, week)
+    return bool(g) and all(x.get("status") == "complete" or (x.get("metadata") or {}).get("is_over") for x in g)
+
+
 PROJ_POS = "&".join("position%5B%5D=" + p for p in ["QB", "RB", "WR", "TE", "K", "DEF"])
 
 

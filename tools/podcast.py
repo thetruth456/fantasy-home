@@ -24,7 +24,7 @@ NOT_INJURY = {"Coach's Decision", "Suspension", "Personal", "Not Injury Related"
 
 RULED_OUT = {"Out", "IR", "PUP"}   # Sleeper tags that count as a miss for a game not played yet (Questionable/Doubtful do not)
 
-# Long-term absences, from news reports (checked Oct 31, 2026; re-checked Nov 2 for every player rostered in the four leagues). back = first date he is expected to be able to play:
+# Long-term absences, from news reports (checked Oct 31, 2026; re-checked Nov 2 for every player rostered in the four leagues, again after Monday night: no new timelines). back = first date he is expected to be able to play:
 #   "season" = every remaining game; {"week": n} = first week he can play. A reported range of N weeks uses the
 #   midpoint, counted in weeks after the week he got hurt (so he misses Weeks inj+1 .. inj+N, minus byes).
 # Every row needs a source; no reported timeline -> no row (Sleeper's tag covers this week only).
@@ -186,6 +186,11 @@ def main(lg, last_arg=None):
     L = get("/v1/league/%s" % LEAGUE)
     season = L["season"]
     last = int(last_arg) if last_arg else int(L["settings"].get("last_scored_leg") or 0)
+    _st = S.sleeper_state()   # every game of the next week final -> count it as completed (matchup points are final)
+    if not last_arg and str(_st.get("season")) == str(L["season"]) and _st.get("season_type") == "regular" \
+            and int(_st.get("week") or 0) == last + 1 and S.week_final(L["season"], last + 1):
+        last += 1
+        print("week %d: every game final, counting it as completed" % last)
     if last < 1:
         raise SystemExit("no completed weeks yet")
     weeks = list(range(1, last + 1))

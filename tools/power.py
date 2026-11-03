@@ -310,6 +310,11 @@ def main(lg, sims=10000):
     L = get("/v1/league/%s" % LEAGUE)
     season, st = L["season"], L["settings"]
     last = int(st.get("last_scored_leg") or 0)
+    _st = S.sleeper_state()   # every game of the next week final -> count it as completed (matchup points are final)
+    if str(_st.get("season")) == str(L["season"]) and _st.get("season_type") == "regular" \
+            and int(_st.get("week") or 0) == last + 1 and S.week_final(L["season"], last + 1):
+        last += 1
+        print("week %d: every game final, counting it as completed" % last)
     cur = last + 1
     pstart = int(st.get("playoff_week_start") or 15)
     reg_end = pstart - 1
