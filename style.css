@@ -139,3 +139,4 @@ td.tw{white-space:normal;min-width:190px;max-width:360px}.inj{color:var(--mut);f
 .lockmsg{margin:0;min-height:1.3em;color:var(--r);font-weight:600;font-size:14px}
 /* compact playoff-odds chart at the top of the Best League weekly report (power.js, opt.compact) */
 .repchart{margin:10px 0 18px}.repchart .odds{margin:0}.repchart .odds h2{margin-bottom:2px}.repchart .ol{gap:4px}.repchart .ol button{padding:3px 7px;font-size:12.5px}
+.odds .mh{margin:18px 0 4px;padding-top:12px;border-top:1px solid var(--line,#e3e8e5)}

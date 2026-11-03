@@ -55,17 +55,18 @@ if(!window.__oddsRz){window.__oddsRz=1;window.addEventListener("resize",function
 var hz=D.inj_hazard||{},CA=D.cal||{source:"own",seasons:["Best League 2025","Best League 2022"]};
 var SEAS=(CA.seasons||[]).map(function(x){return +String(x).slice(-4)}),calTxt=CA.source==="own"?esc(TITLE)+' '+Math.min.apply(null,SEAS)+'\u2013'+String(Math.max.apply(null,SEAS)).slice(2):CA.n+' past team-seasons from '+(function(){var u=[];(CA.seasons||[]).forEach(function(x){var q=String(x).replace(/\s*\d{4}$/,"");if(u.indexOf(q)<0)u.push(q)});return esc(u.length<3?u.join(" and "):u.slice(0,-1).join(", ")+" and "+u[u.length-1])})()+'; ' +esc(TITLE)+' has '+(CA.seasons&&CA.seasons.some(function(x){return x.indexOf(TITLE)===0})?'too few of its own':'no earlier seasons on Sleeper');
 var noKeep=D.keepers_n===0;
-if(cp)h.push('<section class="odds repodds" data-k="po"><h2>Playoff odds through the season</h2><p class="cap">Each point is the Power Rankings simulation rerun with only what was known after that week (W'+D.cur+'* = now). Tap a team to spotlight it'+(opt.link?'; method on the <a href="'+esc(opt.link)+'">Power Rankings</a> tab':'')+'.</p>');
-else h.push('<section class="odds" data-k="po"><h2>Odds through the season</h2><ul class="meth">'+
+var meth=cp?'':'<h3 class="mh">How the odds are built</h3><ul class="meth">'+
 '<li><b>Pre-draft:</b> '+(noKeep?'no keepers this season, so everyone starts level ('+Math.round(100*D.nplay/D.nteams)+'%).':'everyone starts level; keepers add how much better they are than what their pick usually gets.')+'</li>'+
 '<li><b>After the draft:</b> each drafted roster\u2019s projected value, but only '+D.beta0+' of its edge over average counts (how much draft edges held up in '+calTxt+').</li>'+
 '<li><b>Each week:</b> real points per game blend in with projections, and the roster edge is trusted more ('+D.beta_now+' now).</li>'+
 '<li><b>Rest of season:</b> simulated '+D.sims.toLocaleString("en-US")+' times; every score varies by \u00b1'+f1(D.sd_noise)+' pts, plus a hidden boost or drag per team (\u00b1'+f1(D.tau_now)+' now).</li>'+
-'<li><b>Injuries:</b> in each simulated week a healthy player can start missing games (about '+Math.round(100*(hz.RB||0))+'% chance per game at QB/RB/WR/TE, from Sleeper game logs 2021\u201325) for 1 game up to the rest of the season; the best lineup re-forms from the bench or waivers, so depth matters.</li></ul><p class="cap">Each point reruns the simulation with only what was known after that week. Pre-draft = '+(noKeep?'before the draft':'keepers only')+'; Pre = after the draft; W'+D.cur+'* = now (week '+D.cur+' in progress). Hover or tap a team to spotlight it.</p>');
+'<li><b>Injuries:</b> in each simulated week a healthy player can start missing games (about '+Math.round(100*(hz.RB||0))+'% chance per game at QB/RB/WR/TE, from Sleeper game logs 2021\u201325) for 1 game up to the rest of the season; the best lineup re-forms from the bench or waivers, so depth matters.</li></ul>';
+if(cp)h.push('<section class="odds repodds" data-k="po"><h2>Playoff odds through the season</h2><p class="cap">Each point is the Power Rankings simulation rerun with only what was known after that week (W'+D.cur+'* = now). Tap a team to spotlight it'+(opt.link?'; method on the <a href="'+esc(opt.link)+'">Power Rankings</a> tab':'')+'.</p>');
+else h.push('<section class="odds" data-k="po"><h2>Odds through the season</h2><p class="cap">Each point reruns the simulation with only what was known after that week. Pre-draft = '+(noKeep?'before the draft':'keepers only')+'; Pre = after the draft; W'+D.cur+'* = now (week '+D.cur+' in progress). Hover or tap a team to spotlight it.</p>');
 if(NB)h.push('<div class="seg"><button type="button" aria-pressed="true" onclick="powerOdds(this,\'po\')">Playoff %</button><button type="button" aria-pressed="false" onclick="powerOdds(this,\'bye\')">Bye %</button></div>');
 h.push('<div class="ocw" data-key="'+esc(KEY)+'" data-m="'+isMob()+'" data-c="'+(cp?1:0)+'">'+OB[KEY](isMob(),cp)+'</div><div class="ol">');
 order.forEach(function(t){h.push('<button type="button" data-r="'+t.rid+'" onclick="powerFocus(this,'+t.rid+')"><svg width="26" height="8"><line x1="1" y1="4" x2="25" y2="4" stroke="'+ci[t.rid]+'" stroke-width="4"'+(cd[t.rid]?' stroke-dasharray="7 3"':'')+'/></svg>'+esc(short(t.name))+' <b class="v-po">'+r0(t.playoff)+'</b><b class="v-bye">'+r0(t.bye)+'</b></button>')});
-h.push('</div></section>')
+h.push('</div>'+meth+'</section>')
 return h.join("")}
 window.buildPowerOdds=function(D,opt){return D?oddsChart(D,opt):""};
 /* Ben's (podcast co-host) rankings, keyed by Sleeper roster_id: Best League only */
@@ -89,6 +90,9 @@ var h=[];
 h.push('<h1>'+esc(TITLE)+' power rankings: Week '+D.cur+'</h1>');
 h.push('<p class="asof">Snapshot as of '+esc(ptTime(D.asof))+'.'+(window.PODCAST_STANDALONE?'':' Not changed by the hourly update or Refresh everything.')+'</p>');
 
+/* ---- odds through the season first (chart, toggle, legend, then how the odds are built) */
+h.push(oddsChart(D));
+
 /* ---- headlines */
 var top=T[0],byAp=T.slice().sort(function(a,b){return b.ap-a.ap}),bySos=T.slice().sort(function(a,b){return a.sos-b.sos});
 var hole=byAp.filter(function(t){return t.playoff<30})[0];
@@ -111,7 +115,6 @@ h.push('<div class="scroll"><table><thead><tr><th>Rank</th>'+(HASBEN?'<th>Ben\u2
 T.forEach(function(t,i){h.push('<tr><td>'+t.rank+'</td>'+(HASBEN?'<td>'+(BEN[t.rid]||'\u2013')+'</td>':'')+'<td>'+esc(t.name)+'</td><td>'+esc(t.user)+'</td><td>'+rec(t.w,t.l,t.t)+'</td><td>'+f1(t.pf)+'</td><td>'+pill(f1(t.strength),tS[i])+'</td><td>'+pr(t)+'</td><td>'+pill(pc(t.playoff),ptier(t.playoff,67,33))+'</td><td>'+pill(pc(t.first),ptier(t.first,20,5))+'</td><td>'+pill(pc(t.title),ptier(t.title,15,5))+'</td><td class="nt">'+note(t)+'</td></tr>')});
 h.push('</tbody></table></div></section>');
 
-h.push(oddsChart(D));
 
 /* ---- projected finish */
 h.push('<section><h2>Projected finish</h2><p class="cap">Where each team finished across the simulations. The number is the average final standing.</p>');
