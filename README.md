@@ -15,6 +15,8 @@ A GitHub Action (`.github/workflows/update.yml`) runs `python tools/update.py` o
 | FP rank (flex rank for RB/WR/TE, position rank for QB/K/DEF) | FantasyPros consensus | `fp` |
 | Game total and spread (Defense table) | ESPN scoreboard API (DraftKings lines) | `total`, `spread`, `opptot` on `DEFENSE` rows |
 | Defense table: your DEF, then the next 8 best unrostered DEF by Sleeper projection | Sleeper, FantasyPros `dst`, ESPN | `DEFENSE` rows |
+| Kicker table: your K, then the best available unrostered K, up to 10 | Sleeper projections scored with that league's kicking settings, PrizePicks FG-made and kicking-points over/unders, FantasyPros `k` | `KICKERS` rows |
+| Weather column on every player table | ESPN stadium and kickoff, Open-Meteo hourly forecast | `wx` on each row |
 | Quick read, league setup, notes, "as of" line, titles | generated from the data above | `META` in each data file |
 
 The pages hold no week-specific text: `report-core.js` fills the title, as-of line, quick read, setup, notes and week label from `window.REPORTS.<key>.META`, so a new week needs no HTML edit.
@@ -31,7 +33,7 @@ Because the gate uses local Pacific time, the Nov 1 DST change needs no edit. If
 
 ### Failure handling
 
-If one source fails, only that source keeps its previous values (for the same week) and the log says so (shown as warnings on the run page). If a source has no data for a new week yet, those cells show a dash instead of old numbers. If Sleeper itself is unreachable, nothing is changed and the run fails. One league failing does not stop the others from being committed. Nothing is ever fabricated.
+If one source fails, only that source keeps its previous values (for the same week) and the log says so (shown as warnings on the run page). If a source has no data for a new week yet, those cells show a dash instead of old numbers. If Sleeper itself is unreachable, nothing is changed and the run fails. One league failing does not stop the others from being committed. Nothing is ever fabricated. A failed weather fetch keeps the previous weather cells for the same week; a new week with no forecast shows a dash, `no forecast`, or `no obs` instead of last week's weather. Open-Meteo needs no API key. A failed PrizePicks fetch keeps the previous kicker lines for the same week.
 
 ### Defense table
 
@@ -40,6 +42,28 @@ Each league has a Defense table below the flex tiebreaker: your defenses (starte
 * Opp implied total = game total / 2 + this defense's own spread / 2 (spread is negative for the favorite). Game lines come from ESPN's public scoreboard (`site.api.espn.com`, DraftKings odds) through plain `urllib`.
 * Prop-implied pts = Sleeper's projected DEF stat line scored with the league's settings, minus the points-allowed buckets, plus the expected points-allowed score for the opponent's implied total. The opponent's score is modelled as 14 scoring chances worth 7 (touchdown) or 3 (field goal), 77% of expected points from touchdowns, then scored with the league's own `pts_allow_*` settings. Yards-allowed buckets stay as Sleeper projects them.
 * A game with no line yet, a game already played, or a bye shows dashes and falls back to the Sleeper projection (nothing is guessed). If ESPN is unreachable the previous lines for the same week are kept; the as-of line ends with "game lines as of ..." (or "game lines not available").
+
+### Kicker table
+
+Each league has a Kickers table below Defense: your kickers (starter, then bench), then the best available unrostered kickers until the table has 10 rows (`KICKERS` in the data file, `<key>-t-kick` on the page). If you roster more than 10 kickers, all of them are shown. If fewer than 10 kickers qualify, the table is shorter.
+
+* Availability matches the waiver flex list: not rostered anywhere, has a team, the game is not complete, and the player is not Out, IR, PUP, Sus, NA, or Doubtful. Bye and already-played kickers are not added from waivers. Your own kickers stay on the table even on a bye or after they have played.
+* Sleeper proj is the Sleeper stat line scored with this league's kicking settings (extra points, field-goal distance buckets, and miss penalties when the league has them). Sleeper publishes 50+ makes as one bucket. A league that pays a higher rate for 60+ is scored at its 50-59 rate for that bucket, because the 60+ share is not published. A played stat line that has only a total with no distance buckets cannot be re-scored; that final is not filled in by guessing.
+* Fieldwork does not post kicker markets. FG made and Kicking pts are the PrizePicks two-way over/under (standard line). Alternate "demon" and "goblin" prices, and over-only prices, are not used. Kicking points are 3 per field goal and 1 per extra point. When both lines are posted, extra points are kicking points minus 3 times field goals, and the field-goal line is spread across Sleeper's distance mix, then scored with this league's settings. A single line scales that Sleeper shape so the posted stat matches. Miss penalties are not in the markets and are not deducted. If a line is missing, or the two lines cannot be field goals and extra points, or Sleeper has no distance mix for an uneven league, that cell is a dash.
+* FP rank is the FantasyPros weekly kicker rank (`k.php`), colored inside this table only.
+
+### Weather column
+
+Every weekly-report player table (flex, defense, kickers, starters, bench, waivers) has a Weather column. It is the Open-Meteo hourly forecast at the kickoff hour, at the stadium on that week's ESPN schedule. Neutral and international games use that stadium, not the home team's city. Both teams in a game share one forecast. Results are cached under `.cache/` for 45 minutes and requested in one batch per run.
+
+* Outdoor: temperature °F, wind mph, conditions, plus precipitation chance when it is at least 30% and amount when it is at least 0.05 in.
+* `(dome)` is a confirmed fixed roof (Allegiant, Caesars Superdome, Ford Field, U.S. Bank). No outdoor numbers are shown.
+* `(roof ?)` is a retractable roof (AT&T, Lucas Oil, Mercedes-Benz, NRG, State Farm, and Santiago Bernabéu). The numbers are the outdoor forecast. The roof may be open or closed; that is not predicted.
+* `(covered)` is SoFi's fixed canopy with open sides. Temperature and wind are outdoor. Precipitation may not reach the field.
+* `(indoor ?)` is a building ESPN marks indoor that is not in the stadium table. No outdoor numbers.
+* A neutral or non-US game also names the city (`Madrid`, `London`).
+* `(final)` has been played. `(kickoff)` is in progress. `Bye`, `no forecast` (past the 16-day horizon), `no obs` (played, but that hour was not in the feed), and a dash were not filled in.
+* ESPN's own indoor flag is not treated as a roof decision. It stays true for retractable roofs all season.
 
 ### Local run
 
@@ -50,7 +74,15 @@ FORCE=true FH_OUT_DIR=/tmp/out python tools/update.py   # write elsewhere (testi
 FH_NOW=2026-10-25T17:00:00Z python tools/update.py      # pretend it is another time (test the gate)
 ```
 
-Requires Python 3.9+ (`pip install -r tools/requirements.txt` gives zoneinfo data on machines without it). `.cache/` (Sleeper players dump, about 10 MB, refreshed daily) is git-ignored.
+Requires Python 3.9+ (`pip install -r tools/requirements.txt` gives zoneinfo data and `cryptography`). The weekly report also needs `FH_REPORT_PASSWORD` (the existing repository secret). There is no weather API key. The run needs HTTPS to Sleeper, Fieldwork, FantasyPros, ESPN, `api.open-meteo.com`, and `partner-api.prizepicks.com` (kicker over/unders). An unrecognized stadium may also call OpenStreetMap Nominatim once; a miss stays a dash. `.cache/` (Sleeper players dump, about 10 MB, refreshed daily, plus a short-lived weather cache) is git-ignored.
+
+```
+FH_REPORT_PASSWORD='…' FORCE=true python tools/update.py
+FH_REPORT_PASSWORD='…' FORCE=true FH_OUT_DIR=/tmp/fh-out python tools/update.py
+python tools/seal.py check
+```
+
+`check` confirms the password and that every `*-report.js` decrypts. The files are ciphertext. Do not commit a plaintext copy.
 
 ### Manual fixes
 
@@ -103,4 +135,4 @@ Nothing to do by hand. Sleeper switches `week` on its own (around Tuesday). Unti
 
 1. Push this repo to `main` (a token with the `workflow` scope, or a Workflows permission for fine-grained tokens, is needed to push `.github/workflows/`).
 2. Settings, Actions, General: Workflow permissions: Read and write (the workflow also declares `contents: write`).
-3. Run the "Update fantasy data" workflow once from the Actions tab to confirm the runner can reach Sleeper, Fieldwork, FantasyPros and ESPN (the log shows "ESPN game lines: N teams"; N should be about 2 per game).
+3. Run the "Update fantasy data" workflow once from the Actions tab to confirm the runner can reach Sleeper, Fieldwork, FantasyPros, ESPN, and Open-Meteo (the log shows "ESPN game lines: N teams" and "weather: N teams"; N for lines should be about 2 per game).

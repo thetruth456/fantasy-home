@@ -9,6 +9,8 @@ Environment:
   FH_OUT_DIR=<dir> write the data files here instead of the repo root (testing)
   FH_CACHE_DIR     where the Sleeper players dump is cached (default <repo>/.cache)
   FH_REPORT_PASSWORD  required: data files are written encrypted (tools/seal.py); without it nothing is written
+
+Weather uses the public Open-Meteo forecast (no key) and the ESPN scoreboard for the real stadium.
 """
 import datetime as dt
 import json
@@ -21,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build  # noqa: E402
 import seal  # noqa: E402
 import sources as S  # noqa: E402
+import weather  # noqa: E402
 from sources import log  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -35,6 +38,7 @@ LEAGUES = {
     "spacex": ("spacex-report.js", "1398902725940367360", "ppr-flex"),
 }
 TIME_FIELDS = ("generated", "asof", "sources")
+GROUPS = ("STARTERS", "BENCH", "WAIVER", "DEFENSE", "KICKERS")
 
 
 # ------------------------------------------------------------------ schedule gate
@@ -62,8 +66,8 @@ def read_data(path, key, K):
 def write_data(path, key, d, K):
     """Always encrypted (tools/seal.py); there is no plaintext path."""
     obj = {"META": d["META"]}
-    for g in ("STARTERS", "BENCH", "WAIVER", "DEFENSE"):
-        obj[g] = d[g]
+    for g in GROUPS:
+        obj[g] = d.get(g) or []
     K.write(path, "REPORTS." + key, obj)
 
 
@@ -71,7 +75,7 @@ def canon(d):
     if not d:
         return None
     m = {k: v for k, v in (d.get("META") or {}).items() if k not in TIME_FIELDS}
-    return json.dumps([m, d.get("STARTERS"), d.get("BENCH"), d.get("WAIVER"), d.get("DEFENSE") or []], sort_keys=True)
+    return json.dumps([m] + [d.get(g) or [] for g in GROUPS], sort_keys=True)
 
 
 def iso(t):
@@ -139,8 +143,26 @@ def main():
         props = build.Props(fw, ovr_players)
         props_asof = fw.get("lastSuccessAt") or fw.get("collected")
         log("Fieldwork props: %d players (lines collected %s)" % (len(fw["players"]), props_asof))
+        if props.kicker_markets:
+            log("WARNING: Fieldwork has kicker markets (%s); the kicker table uses PrizePicks over/unders instead" % ", ".join(props.kicker_markets))
     except Exception as e:  # noqa: BLE001
         log("WARNING: Fieldwork props unavailable, keeping the previous props for this week: %s" % e)
+
+    # --- kicker over/unders (PrizePicks). Separate from Fieldwork, which has no kicker markets.
+    kicker_props = None
+    kicker_props_asof = None
+    try:
+        kicker_rows = S.fetch_kicker_props()
+        kicker_props = build.KickerProps(kicker_rows)
+        kicker_props_asof = proj_asof
+        n_fg = sum(1 for r in kicker_rows if r.get("fg") is not None)
+        n_kp = sum(1 for r in kicker_rows if r.get("kp") is not None)
+        n_both = sum(1 for r in kicker_rows if r.get("fg") is not None and r.get("kp") is not None)
+        log("kicker O/U: %d players, %d FG lines, %d kicking-point lines, %d with both" % (len(kicker_rows), n_fg, n_kp, n_both))
+        if not kicker_rows:
+            log("WARNING: PrizePicks has no two-way kicker lines; kicker prop cells stay dashes")
+    except Exception as e:  # noqa: BLE001
+        log("WARNING: kicker over/unders unavailable, keeping the previous kicker lines for this week: %s" % e)
 
     # --- FantasyPros ranks
     fp = None
@@ -170,6 +192,24 @@ def main():
     except Exception as e:  # noqa: BLE001
         log("WARNING: ESPN game lines unavailable, keeping the previous lines for this week: %s" % e)
 
+    # --- venues and kickoff weather (actual stadium, including neutral sites)
+    venues = None
+    try:
+        venues = S.fetch_venues(season, week)
+        log("ESPN venues: %d teams" % len(venues))
+    except Exception as e:  # noqa: BLE001
+        log("WARNING: ESPN venues unavailable, weather keeps previous values: %s" % e)
+    wx_result = None
+    if venues is not None:
+        try:
+            wx_result = weather.build_weather_map(venues, now, cache_dir=cache_dir)
+        except Exception as e:  # noqa: BLE001
+            log("WARNING: weather failed (%s); outdoor cells keep previous values" % e)
+            wx_result = None
+    ctx["wx"] = wx_result.by_team if wx_result is not None else None
+    ctx["kicker_props"] = kicker_props
+    fresh_weather_asof = wx_result.asof if wx_result is not None else None
+
     changed, failed = [], []
     for key, (fn, lid, flex_page) in LEAGUES.items():
         path = os.path.join(out_dir, fn)
@@ -179,7 +219,7 @@ def main():
         prev_rows = {}
         prev_lines = {}
         if same_week:
-            for g in ("STARTERS", "BENCH", "WAIVER", "DEFENSE"):
+            for g in GROUPS:
                 for r in prev.get(g, []):
                     prev_rows[(r["name"], r["team"])] = r
             for r in prev.get("DEFENSE", []):  # last known line per team, used only if ESPN is down
@@ -189,7 +229,9 @@ def main():
         try:
             bundle = S.sleeper_league_bundle(lid, week)
             ctx["lines"] = lines if lines is not None else prev_lines
-            d = build.build_league(ctx, bundle, USER_ID, props, fp, flex_page, prev_rows, (prev or {}).get("DEFENSE") if same_week else None)
+            d = build.build_league(ctx, bundle, USER_ID, props, fp, flex_page, prev_rows,
+                                    (prev or {}).get("DEFENSE") if same_week else None,
+                                    (prev or {}).get("KICKERS") if same_week else None)
         except Exception as e:  # noqa: BLE001
             log("ERROR: league %s failed (%s); keeping its previous data" % (key, e))
             failed.append(key)
@@ -199,15 +241,17 @@ def main():
             proj_asof=proj_asof,
             props_asof=props_asof if props is not None else psrc.get("props_asof"),
             fp_asof=fp_asof if fp is not None else psrc.get("fp_asof"),
-            lines_asof=lines_asof if lines is not None else (psrc.get("lines_asof") if prev_lines else None))
+            lines_asof=lines_asof if lines is not None else (psrc.get("lines_asof") if prev_lines else None),
+            weather_asof=fresh_weather_asof if fresh_weather_asof else (psrc.get("weather_asof") if same_week else None),
+            kicker_props_asof=kicker_props_asof if kicker_props is not None else (psrc.get("kicker_props_asof") if same_week else None))
         META = dict(
             key=key, week=week, season=season, season_type=stype, league_id=m["league_id"], name=m["name"],
-            title="%s Week %d: roster, waiver flex options and prop tiebreakers" % (m["name"], week),
+            title="%s Week %d: roster, kickers, waiver flex options and prop tiebreakers" % (m["name"], week),
             lineup=m.get("lineup"),
             quick=build.quick_read(d),
             wcap=build.waiver_caption(d["WAIVER"]),
             setup=build.setup_text(m, week),
-            notes=build.notes_for(d["STARTERS"] + d["BENCH"] + d["WAIVER"], overrides, week),
+            notes=build.notes_for(d["STARTERS"] + d["BENCH"] + d["WAIVER"] + d.get("KICKERS", []) + d.get("DEFENSE", []), overrides, week),
             scoring=m["scoring"], fp_page=flex_page, sources=sources,
             asof=build.asof_text(sources), generated=iso(now if os.environ.get("FH_NOW") else dt.datetime.now(dt.timezone.utc)))
         d["META"] = META
@@ -220,10 +264,15 @@ def main():
             log("%-7s data changed -> %s" % (key, fn))
         write_data(path, key, d, K)
         changed.append(key)
-        unranked = [r["name"] for r in d["STARTERS"] + d["BENCH"] + d["WAIVER"] if r["fp"] == build.DASH and r["status"] in ("Healthy", "Questionable") and r["pos"] in ("RB", "WR", "TE", "QB", "K", "DEF")]
+        rows = []
+        for g in GROUPS:
+            rows.extend(d.get(g) or [])
+        unranked = [r for r in rows if r["fp"] == build.DASH and r["status"] in ("Healthy", "Questionable") and r["pos"] in ("RB", "WR", "TE", "QB", "K", "DEF")]
         if unranked:
             log("        no FantasyPros rank for %d player(s) (names not logged: Actions logs are public)" % len(unranked))
-        noprops = [r["name"] for r in d["STARTERS"] + d["BENCH"] + d["WAIVER"] if r["pos"] in ("RB", "WR", "TE") and r["status"] not in build.SKIP_PROPS and r["pp"] is None]
+        ks = d.get("KICKERS") or []
+        log("        kickers: %d (%d rostered)" % (len(ks), sum(1 for r in ks if r.get("slot") != "WAIVER")))
+        noprops = [r for r in d["STARTERS"] + d["BENCH"] + d["WAIVER"] if r["pos"] in ("RB", "WR", "TE") and r["status"] not in build.SKIP_PROPS and r["pp"] is None]
         if noprops:
             log("        no prop-implied pts (missing lines) for %d player(s)" % len(noprops))
     log("Done. Changed: %s. Failed: %s." % (", ".join(changed) or "none", ", ".join(failed) or "none"))
