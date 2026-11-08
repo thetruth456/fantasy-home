@@ -220,6 +220,113 @@ def fetch_game_lines(season, week):
     return out
 
 
+def _scoreboard(season, week):
+    d = get_json("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=%s&seasontype=2&dates=%s" % (week, season), timeout=45)
+    wk = (d.get("week") or {}).get("number")
+    if wk is not None and str(wk) != str(week):
+        raise RuntimeError("ESPN scoreboard is on week %s, not %s" % (wk, week))
+    return d
+
+
+def venues_from_scoreboard(d, week):
+    """{team: venue} from an ESPN scoreboard payload. Both clubs share that game's actual venue.
+    Completed games stay in the map so a played kickoff can still be described. Raises if the week
+    does not match or there are no games."""
+    wk = (d.get("week") or {}).get("number")
+    if wk is not None and str(wk) != str(week):
+        raise RuntimeError("ESPN scoreboard is on week %s, not %s" % (wk, week))
+    events = d.get("events") or []
+    if not events:
+        raise RuntimeError("ESPN scoreboard has no games")
+    out = {}
+    for e in events:
+        c = (e.get("competitions") or [{}])[0]
+        st = ((e.get("status") or {}).get("type") or {})
+        state = st.get("state") or ("post" if st.get("completed") else "pre")
+        v = c.get("venue") or {}
+        addr = v.get("address") or {}
+        kick = c.get("startDate") or e.get("date")
+        info = dict(
+            venue_id=str(v.get("id") or ""),
+            venue=v.get("fullName") or "",
+            city=addr.get("city") or "",
+            region=addr.get("state") or "",
+            country=addr.get("country") or "",
+            indoor=bool(v.get("indoor")),
+            neutral=bool(c.get("neutralSite")),
+            kickoff=kick,
+            state=state)
+        for t in c.get("competitors") or []:
+            ab = ((t.get("team") or {}).get("abbreviation")) or ""
+            if not ab:
+                continue
+            out[ESPN_ALIAS.get(ab, ab)] = info
+    return out
+
+
+def fetch_venues(season, week):
+    """Actual stadium and kickoff for every team that plays this week. Raises if ESPN is unreachable or on another week."""
+    return venues_from_scoreboard(_scoreboard(season, week), week)
+
+
+# ---------------------------------------------------------------- kicker over/unders (PrizePicks two-way lines)
+# Fieldwork's week page has no kicker markets. PrizePicks posts a standard over/under for
+# field goals made and for kicking points (3 per field goal + 1 per extra point). Demon/goblin
+# alternates and over-only prices are not an over/under and are left out.
+KICKER_OU = {"FG Made": "fg", "Kicking Points": "kp"}
+
+
+def parse_kicker_props(d):
+    """Rows {name, team, fg, kp} from a PrizePicks projections payload. Raises if the payload is not that feed."""
+    if not isinstance(d, dict) or not isinstance(d.get("data"), list):
+        raise RuntimeError("PrizePicks payload has no projections")
+    byid = {}
+    for x in d.get("included") or []:
+        if isinstance(x, dict):
+            byid[(x.get("type"), x.get("id"))] = x
+    best = {}  # (player id, stat) -> (updated, line, name, team)
+    for p in d["data"]:
+        if not isinstance(p, dict):
+            continue
+        a = p.get("attributes") or {}
+        if a.get("odds_type") != "standard" or a.get("allowed_wager_types") != "under_or_over":
+            continue
+        if a.get("status") not in (None, "pre_game"):
+            continue
+        rel = p.get("relationships") or {}
+        st = ((rel.get("stat_type") or {}).get("data")) or {}
+        stat = (byid.get((st.get("type"), st.get("id"))) or {}).get("attributes") or {}
+        kind = KICKER_OU.get(stat.get("name") or a.get("stat_type"))
+        if not kind:
+            continue
+        pl = ((rel.get("new_player") or {}).get("data")) or {}
+        player = (byid.get((pl.get("type"), pl.get("id"))) or {}).get("attributes") or {}
+        if player.get("position") not in (None, "", "K"):
+            continue
+        name, team = player.get("name") or player.get("display_name"), player.get("team")
+        line = a.get("line_score")
+        if not name or not isinstance(line, (int, float)) or isinstance(line, bool):
+            continue
+        pid = pl.get("id") or name
+        key = (pid, kind)
+        updated = a.get("updated_at") or ""
+        prev = best.get(key)
+        if prev is None or updated > prev[0]:
+            best[key] = (updated, float(line), name, team or "")
+    acc = {}
+    for (pid, kind), (_u, line, name, team) in best.items():
+        row = acc.setdefault(pid, {"name": name, "team": team, "fg": None, "kp": None})
+        row[kind] = line
+        row["name"], row["team"] = name, team
+    return list(acc.values())
+
+
+def fetch_kicker_props():
+    """Current NFL kicker over/unders. Raises if PrizePicks is unreachable or the payload is unusable."""
+    d = get_json("https://partner-api.prizepicks.com/projections?league_id=9&per_page=1000", timeout=90)
+    return parse_kicker_props(d)
+
+
 def norm(s):
     s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower()
     s = re.sub(r"[.']", "", s)

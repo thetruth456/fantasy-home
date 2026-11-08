@@ -1,6 +1,7 @@
 /* Refresh Sleeper projections in the browser. Re-pulls Sleeper projections (and each league's scoring settings),
    re-scores every plain-projection row, and redraws the tables. Props, FantasyPros ranks and prop-implied pts stay as the snapshot.
-   Rows that already played (final score), or are Bye/Out/IR, are never overwritten. Fetched once, shared by all leagues on the page. */
+   Rows that already played (final score), or are Bye/Out/IR, are never overwritten. Fetched once, shared by all leagues on the page.
+   Kickers and the weather column are part of the encrypted weekly snapshot the Action writes; this file does not fetch weather. */
 (function(){
 var API="https://api.sleeper.app";
 var REPO="thetruth456/fantasy-home",WORKFLOW="update.yml",REF="main",TOKEN_KEY="fh_gh_token";

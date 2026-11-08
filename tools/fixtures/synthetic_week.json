@@ -1,0 +1,43 @@
+{
+  "note": "Synthetic fixture only. Not a league report and not a waiver list.",
+  "REPORTS": {
+    "best": {
+      "META": {
+        "title": "Synthetic fixture Week 9",
+        "asof": "Props not available; Sleeper projections not available; FantasyPros ranks not available; game lines not available; weather as of Nov 8, 18:00 UTC.",
+        "wcap": "Synthetic waiver caption. Weather is the kickoff forecast at the game's actual stadium.",
+        "week": 9,
+        "lineup": {"ok": true, "swaps": [], "issues": []},
+        "quick": ["Synthetic quick read. No real roster is shown."],
+        "notes": ["Weather: (dome) is indoor. (roof ?) is a retractable roof and the numbers are outdoor. (covered) is a canopy. Bye, no forecast, no obs, and a dash were not filled in."],
+        "setup": [["League", "Synthetic, 12 teams, 2026 season, Week 9", false], ["Scoring", "Half PPR", true]]
+      },
+      "STARTERS": [
+        {"slot": "WR1", "name": "Riley Sample", "pos": "WR", "team": "GB", "opp": "at MIN (Sun)", "status": "Healthy", "proj": "14.2", "pn": 14.2, "pp": 16.4, "fp": "12", "rush": "\u2014", "rec": "71.5", "recs": "5.5", "atd": "-115", "atdr": "", "wx": "42\u00b0F, 11 mph, Snow, Green Bay"},
+        {"slot": "K", "name": "Alex Sample", "pos": "K", "team": "MIN", "opp": "vs BUF (Mon)", "status": "Healthy", "proj": "8.5", "pn": 8.5, "pp": null, "fp": "K1", "rush": "\u2014", "rec": "\u2014", "recs": "\u2014", "atd": "\u2014", "atdr": "", "wx": "(dome)"}
+      ],
+      "BENCH": [
+        {"slot": "BN", "name": "Blake Sample", "pos": "K", "team": "TEN", "opp": "BYE", "status": "Bye", "proj": "0.0", "pn": 0, "pp": null, "fp": "\u2014", "rush": "\u2014", "rec": "\u2014", "recs": "\u2014", "atd": "\u2014", "atdr": "", "wx": "Bye"}
+      ],
+      "WAIVER": [
+        {"slot": "WAIVER", "name": "Casey Sample", "pos": "WR", "team": "SEA", "opp": "vs ARI (Sun)", "status": "Questionable", "proj": "11.0", "pn": 11, "pp": 10.2, "fp": "40", "rush": "\u2014", "rec": "48", "recs": "4", "atd": "+140", "atdr": "", "wx": "\u2014"}
+      ],
+      "DEFENSE": [
+        {"slot": "DEF", "name": "MIN D/ST", "pos": "DEF", "team": "MIN", "opp": "vs BUF (Mon)", "status": "Healthy", "proj": "7.2", "pn": 7.2, "pp": 8.1, "fp": "DEF4", "wx": "(dome)", "total": 43.5, "spread": -2.5, "opptot": 20.5},
+        {"slot": "WAIVER", "name": "GB D/ST", "pos": "DEF", "team": "GB", "opp": "at MIN (Sun)", "status": "Healthy", "proj": "6.0", "pn": 6, "pp": 5.4, "fp": "DEF11", "wx": "no forecast", "total": 43.5, "spread": 2.5, "opptot": 23.0}
+      ],
+      "KICKERS": [
+        {"slot": "K", "name": "Alex Sample", "pos": "K", "team": "MIN", "opp": "vs BUF (Mon)", "status": "Healthy", "proj": "8.5", "pn": 8.5, "pp": 9.2, "fp": "K1", "fg": "1.5", "kp": "7.5", "wx": "(dome)"},
+        {"slot": "BN", "name": "Blake Sample", "pos": "K", "team": "TEN", "opp": "BYE", "status": "Bye", "proj": "0.0", "pn": 0, "pp": null, "fp": "\u2014", "wx": "Bye"},
+        {"slot": "WAIVER", "name": "Cameron Sample", "pos": "K", "team": "IND", "opp": "vs DAL (Sun)", "status": "Healthy", "proj": "9.4", "pn": 9.4, "pp": null, "fp": "K2", "fg": "\u2014", "kp": "8.5", "wx": "49\u00b0F, 7 mph, Clear (roof ?)"},
+        {"slot": "WAIVER", "name": "Drew Sample", "pos": "K", "team": "LAC", "opp": "vs HOU (Sun)", "status": "Healthy", "proj": "8.8", "pn": 8.8, "pp": null, "fp": "K3", "wx": "72\u00b0F, 6 mph, Clear (covered)"},
+        {"slot": "WAIVER", "name": "Eden Sample", "pos": "K", "team": "GB", "opp": "at MIN (Sun)", "status": "Healthy", "proj": "8.1", "pn": 8.1, "pp": null, "fp": "K4", "wx": "42\u00b0F, 11 mph, Snow"},
+        {"slot": "WAIVER", "name": "Finley Sample", "pos": "K", "team": "ATL", "opp": "vs CIN (Sun)", "status": "Healthy", "proj": "7.6", "pn": 7.6, "pp": null, "fp": "K6", "wx": "57\u00b0F, 9 mph, Rain 40% (roof ?), Madrid"},
+        {"slot": "WAIVER", "name": "Gray Sample", "pos": "K", "team": "NO", "opp": "vs CLE (Sun)", "status": "Played", "proj": "11.0 final", "pn": 11, "pp": null, "fp": "K8", "wx": "(dome)"},
+        {"slot": "WAIVER", "name": "Harper Sample", "pos": "K", "team": "BAL", "opp": "vs JAX (Thu)", "status": "Played", "proj": "9.0 final", "pn": 9, "pp": null, "fp": "K9", "wx": "71\u00b0F, 5 mph, Overcast (final)"},
+        {"slot": "WAIVER", "name": "Indigo Sample", "pos": "K", "team": "KC", "opp": "vs NYJ (Sun)", "status": "Healthy", "proj": "7.2", "pn": 7.2, "pp": null, "fp": "K10", "wx": "55\u00b0F, 10 mph, Clear (kickoff)"},
+        {"slot": "WAIVER", "name": "Jules Sample", "pos": "K", "team": "PHI", "opp": "vs NYG (Sun)", "status": "Healthy", "proj": "6.4", "pn": 6.4, "pp": null, "fp": "K14", "wx": "no obs"}
+      ]
+    }
+  }
+}
