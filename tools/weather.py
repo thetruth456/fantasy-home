@@ -10,8 +10,10 @@ every retractable roof across 2026 weeks 1-9, so it is not a gameday roof decisi
 * outdoor: the forecast as-is.
 * unknown indoor building: "(indoor ?)" and no outdoor numbers. Unknown open-air buildings are geocoded or left blank.
 
-Forecast is the Open-Meteo hourly value at the kickoff hour (temperature F, wind mph, conditions).
-Nothing is interpolated from another hour or another city. A miss is an explicit marker.
+Forecast is the Open-Meteo model value at the kickoff hour (temperature F, wind mph, conditions).
+It is not a station observation. (final) and (kickoff) only mark that the game has been played or
+is in progress; the numbers are still that model hour. Nothing is interpolated from another hour
+or another city. A miss is an explicit marker.
 """
 import datetime as dt
 import json

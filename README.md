@@ -54,7 +54,7 @@ Each league has a Kickers table below Defense: your kickers (starter, then bench
 
 ### Weather column
 
-Every weekly-report player table (flex, defense, kickers, starters, bench, waivers) has a Weather column. It is the Open-Meteo hourly forecast at the kickoff hour, at the stadium on that week's ESPN schedule. Neutral and international games use that stadium, not the home team's city. Both teams in a game share one forecast. Results are cached under `.cache/` for 45 minutes and requested in one batch per run.
+Every weekly-report player table (flex, defense, kickers, starters, bench, waivers) has a Weather column. It is the Open-Meteo model forecast for the kickoff hour, at the stadium on that week's ESPN schedule. It is not a station observation, including after the game has started. Neutral and international games use that stadium, not the home team's city. Both teams in a game share one forecast. Results are cached under `.cache/` for 45 minutes and requested in one batch per run.
 
 * Outdoor: temperature °F, wind mph, conditions, plus precipitation chance when it is at least 30% and amount when it is at least 0.05 in.
 * `(dome)` is a confirmed fixed roof (Allegiant, Caesars Superdome, Ford Field, U.S. Bank). No outdoor numbers are shown.
@@ -62,7 +62,7 @@ Every weekly-report player table (flex, defense, kickers, starters, bench, waive
 * `(covered)` is SoFi's fixed canopy with open sides. Temperature and wind are outdoor. Precipitation may not reach the field.
 * `(indoor ?)` is a building ESPN marks indoor that is not in the stadium table. No outdoor numbers.
 * A neutral or non-US game also names the city (`Madrid`, `London`).
-* `(final)` has been played. `(kickoff)` is in progress. `Bye`, `no forecast` (past the 16-day horizon), `no obs` (played, but that hour was not in the feed), and a dash were not filled in.
+* `(final)` means the game has been played. `(kickoff)` means it is in progress. In both cases the numbers are still the Open-Meteo model value for the kickoff hour, not a measured observation. `Bye`, `no forecast` (past the model's 16-day horizon), `no obs` (that kickoff hour was missing from the model feed), and a dash were not filled in.
 * ESPN's own indoor flag is not treated as a roof decision. It stays true for retractable roofs all season.
 
 ### Local run
