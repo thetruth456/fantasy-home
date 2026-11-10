@@ -575,13 +575,50 @@ class Keepers(unittest.TestCase):
         self.assertEqual(keepers.keep_cost(5), (3, "Rd 5"))
         self.assertEqual(keepers.keep_cost(15), (9, "Rd 15"))
         self.assertEqual(keepers.keep_cost(11), (9, "Rd 11"))
-        self.assertEqual(keepers.keep_cost(1), (1, "Rd 1"))
-        self.assertEqual(keepers.keep_cost(2), (1, "Rd 2"))
+        self.assertEqual(keepers.keep_cost(1), (None, "early"))
+        self.assertEqual(keepers.keep_cost(2), (None, "early"))
         self.assertEqual(keepers.keep_cost(3), (1, "Rd 3"))
         self.assertEqual(keepers.keep_cost(4), (2, "Rd 4"))
         self.assertEqual(keepers.keep_cost(None), (9, "Waiver"))
         self.assertEqual(keepers.keep_cost(0), (None, None))
         self.assertEqual(keepers.keep_cost("nope"), (None, None))
+
+    def test_third_round_is_a_first_and_a_defense_is_omitted(self):
+        players, proj, picks = {}, [], []
+        for i in range(20):
+            pid = "e%02d" % i
+            players[pid] = {"full_name": "Early %02d" % i, "position": "WR", "team": "GB"}
+            proj.append({"player_id": pid, "team": "GB", "player": {"position": "WR", "full_name": "Early %02d" % i},
+                         "stats": {"gp": 17, "rec_yd": (30 - i) * 17 / 0.1, "adp_half_ppr": i + 1}})
+        players["def"] = {"full_name": "GB D/ST", "position": "DEF", "team": "GB"}
+        proj.append({"player_id": "def", "team": "GB", "player": {"position": "DEF", "full_name": "GB D/ST"},
+                     "stats": {"gp": 1, "sack": 51, "adp_half_ppr": 10}})
+        users = [{"user_id": "u1", "metadata": {"team_name": "North Sample"}}]
+        rosters = [{"roster_id": 1, "owner_id": "u1", "players": ["e00", "e01", "e02", "def"]}]
+        drafts = [{"season": "2026", "rounds": 15, "picks": [
+            {"player_id": "e00", "round": 1, "is_keeper": False},
+            {"player_id": "e01", "round": 2, "is_keeper": False},
+            {"player_id": "e02", "round": 3, "is_keeper": False},
+            {"player_id": "def", "round": 15, "is_keeper": False},
+        ]}]
+        ros = {"players": [
+            {"player_name": "Early 00", "player_team_id": "GB", "rank_ecr": 5, "pos_rank": "WR2"},
+            {"player_name": "Early 01", "player_team_id": "GB", "rank_ecr": 8, "pos_rank": "WR4"},
+            {"player_name": "Early 02", "player_team_id": "GB", "rank_ecr": 12, "pos_rank": "WR6"},
+            {"player_name": "GB D/ST", "player_team_id": "GB", "rank_ecr": 1, "pos_rank": "DEF1"},
+        ]}
+        pack = keepers.build(_bundle([], users, rosters), {"proj": proj, "stats": [], "ros": {keepers.ROS_HALF: ros}},
+                             players, drafts=drafts)
+        by = {r["name"]: r for r in pack["rows"]}
+        self.assertEqual(set(by), {"Early 02"})
+        self.assertEqual(by["Early 02"]["cost"], 1)
+        self.assertEqual(by["Early 02"]["how"], "Rd 3")
+        self.assertAlmostEqual(by["Early 02"]["value"], keepers.round_anchor(1, 12) - 12)
+        early = {p["name"]: p["round"] for p in pack["meta"]["early"]}
+        self.assertEqual(early, {"Early 00": 1, "Early 01": 2})
+        self.assertNotIn("GB D/ST", by)
+        self.assertNotIn("GB D/ST", early)
+        self.assertEqual(pack["meta"]["ineligible"], [])
 
     def test_two_year_rule_is_not_a_hardcoded_name(self):
         # Jaxon Smith-Njigba kept only in 2026 is still eligible. A different player kept
@@ -631,12 +668,15 @@ class Keepers(unittest.TestCase):
         # a defense season line is published with gp 1; that must not become 100 points per game
         self.assertAlmostEqual(keepers.projection_ppg({"sack": 1}, {"sack": 51, "gp": 1}, "DEF"), 3)
         self.assertAlmostEqual(keepers.projection_ppg({"rec_yd": 0.1}, {"rec_yd": 170, "gp": 17}, "WR"), 1)
-        # a cheap starter's surplus beats an expensive star when the round gap is real
-        cheap = keepers.surplus(14, 8, 1)
-        star = keepers.surplus(20, 8, 11)
-        self.assertGreater(cheap, star)
-        self.assertAlmostEqual(cheap, 5)
-        self.assertAlmostEqual(star, 1)
+        # Higgins-like: rest-of-season rank 17, kept at a 2nd (middle pick 18) -> about zero.
+        # Coleman-like: rank 28, kept at a 7th (middle pick 78) -> a large discount.
+        higgins = keepers.adp_discount(17, 2, 12)
+        coleman = keepers.adp_discount(28, 7, 12)
+        self.assertAlmostEqual(higgins, 1)
+        self.assertAlmostEqual(coleman, 50)
+        self.assertGreater(coleman, higgins)
+        # Sleeper's published ADP (Higgins 39.6, Coleman 145.3) would rank Higgins ahead.
+        self.assertLess(keepers.adp_discount(145.3, 7, 12), keepers.adp_discount(39.6, 2, 12))
 
     def test_history_notes_document_conflicts_without_names(self):
         drafts = [
@@ -675,10 +715,12 @@ class Keepers(unittest.TestCase):
         self.assertEqual(rows[0]["name"], "Player 010")
         self.assertEqual(rows[0]["cost"], 9)
         self.assertEqual(rows[0]["how"], "Rd 15")
-        self.assertGreater(by["Player 010"]["value"], by["Player 001"]["value"])
-        self.assertEqual(by["Player 001"]["cost"], 1)
-        self.assertEqual(by["Player 001"]["how"], "Rd 1")
-        self.assertEqual(by["Player 001"]["owner"], "South Sample")
+        self.assertAlmostEqual(by["Player 010"]["value"], 101)
+        self.assertNotIn("Player 001", by)
+        early = {p["name"]: p for p in pack["meta"]["early"]}
+        self.assertEqual(early["Player 001"]["round"], 1)
+        self.assertEqual(early["Player 001"]["owner"], "South Sample")
+        self.assertNotIn("Player 001", {p["name"] for p in pack["meta"]["ineligible"]})
         self.assertEqual(by["Waiver Add"]["cost"], 9)
         self.assertEqual(by["Waiver Add"]["how"], "Waiver")
         self.assertEqual(by["Player 008"]["cost"], 6)
@@ -703,6 +745,8 @@ class Keepers(unittest.TestCase):
         self.assertIsNone(keepers.extra_note("zbt"))
         self.assertIsNone(keepers.extra_note("spacex"))
         self.assertIn("previous two seasons", keepers.extra_note("best"))
+        self.assertIn("3rd-round", keepers.extra_note("best"))
+        self.assertIn("Defenses are not keepers", keepers.extra_note("best"))
         self.assertEqual(keepers.ros_page({"rec": 0.5}), "ros-half-point-ppr-overall")
         self.assertEqual(keepers.ros_page({"rec": 1}), "ros-ppr-overall")
         self.assertIsNone(keepers.ros_page({"rec": 0}))
@@ -830,9 +874,9 @@ def write_fixture_page(dest):
 <section id="best-waivers"><h2>Waiver flex options</h2><p class="cap" id="best-wcap"></p><div class="scroll" id="best-t-waiver"></div></section>
 <section id="best-keepers"><h2 id="best-keep-title">Top keepers</h2>
 <ul class="cap method">
-<li>Cost is this year's draft round minus 2, including the round a player was already kept in. It is never earlier than the 1st or later than the 9th. A player who was not in this year's draft (waiver or free agency) costs a 9th. A trade does not change the round; the table shows whoever holds him now.</li>
-<li>A player kept in both of the previous two seasons is ineligible and is left off the ranking. That uses the keeper flags on this league's drafts. Names, when the history has them, are under the table.</li>
-<li>Value is expected points per game above a replacement player, minus the typical value of a pick in that keep round. Expected points average this year's scoring (pulled toward that player's Sleeper projection) and the Sleeper points of the same FantasyPros rest-of-season rank. The round's value is the ADP neighborhood of its middle pick. Best League uses the half-PPR rest-of-season ranks and this league's scoring. A dash means that input was missing.</li>
+<li>Cost is this year's draft round minus 2, including the round a player was already kept in. A 3rd-round pick is a 1st-round keeper, and that is the earliest keep. A player drafted in the 1st or 2nd round cannot be kept. The latest cost is a 9th. A player who was not in this year's draft (waiver or free agency) costs a 9th. A trade does not change the round; the table shows whoever holds him now.</li>
+<li>A player kept in both of the previous two seasons is ineligible and is left off the ranking. A 1st- or 2nd-round pick is ineligible too, and is not given a 1st-round cost. Both lists, when the drafts have them, are under the table.</li>
+<li>Value is how many picks earlier he would be drafted today than the middle of his keep round. Today's slot is his FantasyPros rest-of-season rank (half-PPR here). If that rank is missing, it is his Sleeper ADP. A rank already around the keep round is about zero: he could just be drafted there. Defenses are not keepers. A dash means the draft slot was missing.</li>
 </ul>
 <div class="scroll" id="best-t-keep"></div>
 <ul class="cap keep-foot" id="best-keep-foot" hidden></ul>

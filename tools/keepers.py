@@ -4,7 +4,9 @@ The weekly report is for the current season. This table is the keep decision for
 following season, using current rosters. ZBT and SpaceX are not keeper tables here.
 
 Cost, from this league's most recent completed draft (Sleeper `is_keeper` picks count):
-  keep round = draft round - 2, then held to 1 through 9.
+  keep round = draft round - 2, capped at 9.
+  A 3rd-round pick is a 1st-round keeper. That is the earliest keep. A pick in the
+  1st or 2nd round cannot be kept and is not floored to a 1st-round cost.
   A player with no pick in that draft costs a 9th (waiver, free agency, or any other
   path onto the roster). A trade does not change the round. The current roster only
   decides who holds the player.
@@ -12,27 +14,26 @@ Cost, from this league's most recent completed draft (Sleeper `is_keeper` picks 
   both keeper years. Back-to-back keeper rounds in these leagues usually drop by 2,
   which is the same step. The 9th-round cap is applied even when a draft kept someone later.
 
-Ineligible: `is_keeper` in both of the two seasons before the target season. Those
-players are left off the ranking. A name is never hardcoded.
+Ineligible, and left off the ranking: a player kept in both of the two seasons before
+the target season, and a player whose pick this year is in the 1st or 2nd round.
+Those two lists are separate. A name is never hardcoded.
 
-Value (points per game):
-  expected = average of
-    (1) 2026 points per game, shrunk toward that player's Sleeper season projection
-        with weight gp / (gp + 7), the same prior the power model uses, and
-    (2) the Sleeper projected points per game of whichever player sits at the same
-        FantasyPros rest-of-season overall rank (half-PPR or PPR, matching the league).
-  If one side is missing, the other is used and the missing column is left blank.
-  Surplus = (expected - replacement at the position) - typical value of the keep round.
-  Replacement is the Nth-best projected points per game at the position (tools/draftprior.py).
-  The round's value is the mean value-over-replacement of the ADP neighborhood around
-  the middle pick of that round, the same window draftprior uses for a single pick.
-  ADP value-over-replacement is floored at 0. The player's own surplus is not, so a
-  bust can rank below the round. Players with no surplus are omitted, not filled with 0.
+Value is the draft-slot discount, in picks:
+  middle pick of the keep round, minus where he would be drafted today.
+  Today's slot is his FantasyPros rest-of-season overall rank for this league's
+  scoring. That rank already moves with 2026 production. Sleeper's adp_half_ppr /
+  adp_ppr field is only the fallback when the rank is missing: in November 2026 it
+  still prices Tee Higgins around pick 40 and Jonah Coleman around pick 145, which
+  would rank a 2nd-round Higgins keep ahead of a later Coleman keep. Their
+  half-PPR rest-of-season ranks (17 and 28) do the opposite, which is the check.
+  A player whose rank sits on the keep round scores about zero. He could just be
+  drafted there. Defenses are omitted: Sleeper's 2026 half-PPR ADP for the 32
+  defenses starts at pick 95 (round 8 of 12) and 30 of 32 are after round 9.
+  A player with no rank and no Sleeper ADP is omitted, not scored as zero.
 """
 import statistics
 
 import build as scoring
-import draftprior as DP
 import sources as S
 from leagues import adp_key
 
@@ -45,10 +46,12 @@ ROS_HALF = "ros-half-point-ppr-overall"
 ROS_PPR = "ros-ppr-overall"
 DATA_NOTE = (
     "Keepers: the top 24 for next season are listed above the league setup. "
-    "Cost is this year's draft round minus 2, never earlier than the 1st or later than the 9th. "
+    "Cost is this year's draft round minus 2. A 3rd-round pick costs a 1st, and that is the earliest keep. "
+    "A 1st- or 2nd-round pick cannot be kept. The latest cost is a 9th. "
     "A player who was not in this year's draft costs a 9th. "
     "Players kept in both of the previous two seasons are left off. "
-    "Value is surplus points per game versus the ADP value of that round, using this year's points and FantasyPros rest-of-season ranks for this league's scoring."
+    "Value is the pick discount: the middle of the keep round minus his FantasyPros rest-of-season rank (Sleeper ADP if that rank is missing). "
+    "Defenses are not keepers."
 )
 
 
@@ -73,8 +76,11 @@ def ros_page(scoring):
 def keep_cost(draft_round):
     """(cost, how) from a draft round, or (9, 'Waiver') when the player was not drafted.
 
-    A round that is missing or not a positive integer returns (None, None): the cost is
-    unknown and is not guessed. Waiver is only the explicit 'not in the draft' case.
+    Rounds 1 and 2 return (None, 'early'): those players cannot be kept, and the cost
+    is not floored at 1. A round that is missing or not a positive integer returns
+    (None, None): the cost is unknown and is not guessed. Waiver is only the explicit
+    'not in the draft' case. A 3rd-round pick costs a 1st. Later picks subtract 2 and
+    cap at 9.
     """
     if draft_round is None:
         return COST_MAX, "Waiver"
@@ -84,7 +90,9 @@ def keep_cost(draft_round):
         return None, None
     if isinstance(draft_round, bool) or rd < 1:
         return None, None
-    return max(COST_MIN, min(COST_MAX, rd - 2)), "Rd %d" % rd
+    if rd < 3:
+        return None, "early"
+    return min(COST_MAX, rd - 2), "Rd %d" % rd
 
 
 def round_anchor(rnd, nteams):
@@ -103,6 +111,24 @@ def round_baseline(vor_in_adp_order, nteams, rnd):
     if not window:
         return None
     return statistics.mean(window)
+
+
+def adp_discount(slot, cost_round, nteams):
+    """Picks gained by keeping him: middle of the keep round minus his current draft slot.
+
+    Positive means his current draft slot is earlier than the round he would cost.
+    A slot already on that round is about zero. None when the slot is missing.
+    """
+    if slot is None or cost_round is None:
+        return None
+    try:
+        slot_n = float(slot)
+        cost_n = int(cost_round)
+    except (TypeError, ValueError):
+        return None
+    if slot_n <= 0 or cost_n < 1:
+        return None
+    return round_anchor(cost_n, nteams) - slot_n
 
 
 def kept_seasons(drafts, player_id):
@@ -281,7 +307,7 @@ def history_notes(drafts, season, settings):
     if deltas:
         n = sum(1 for x in deltas if x == -2)
         notes.append(
-            "In back-to-back seasons the keeper round dropped by 2 in %d of %d cases. Next year's cost is this year's draft round minus 2, then held to rounds 1 through 9."
+            "In back-to-back seasons the keeper round dropped by 2 in %d of %d cases. Next year's cost is this year's draft round minus 2, capped at the 9th. A 1st- or 2nd-round pick cannot be kept."
             % (n, len(deltas)))
     late = []
     for d in cur:
@@ -427,8 +453,8 @@ def _one(v):
 def build(bundle, shared, players, drafts=None):
     """Return {rows, meta} for one league. drafts=None loads Sleeper history.
 
-    Rows are the top 24 eligible players with a real surplus. Ineligible players are
-    listed on meta only.
+    Rows are the top 24 eligible players with a draft-slot discount. Ineligible players
+    are listed on meta only. Defenses are omitted.
     """
     league = bundle["league"]
     season = str(league.get("season"))
@@ -450,39 +476,13 @@ def build(bundle, shared, players, drafts=None):
         notes.append("No completed draft for %s, so keep costs were not guessed." % season)
         return {"rows": [], "meta": _meta(for_season, scoring, page if ros_block else None, [], notes)}
     if page and not ros_block:
-        notes.append("FantasyPros rest-of-season ranks were unavailable, so the ROS column is a dash and value uses this year's scoring and the Sleeper projection only.")
+        notes.append("FantasyPros rest-of-season ranks were unavailable, so the ROS column is a dash and value uses Sleeper ADP when that player has one.")
     if not nteams:
         notes.append("League size was missing, so the round values were not guessed.")
         return {"rows": [], "meta": _meta(for_season, scoring, page if ros_block else None, [], notes)}
 
     proj_rows = _index_rows(shared.get("proj"))
     stat_rows = _index_rows(shared.get("stats"))
-    proj_ppg = {}
-    by_pos = {}
-    adp_rows = []
-    for pid, e in proj_rows.items():
-        pos, _name, _team = _pos_name_team(pid, players, e, None)
-        ppg = projection_ppg(scoring, e.get("stats"), pos)
-        if ppg is None or not pos:
-            continue
-        proj_ppg[pid] = (pos, ppg)
-        by_pos.setdefault(pos, []).append(ppg)
-        adp = _adp(e.get("stats"), scoring)
-        if adp is not None:
-            adp_rows.append((adp, pid, pos, ppg))
-    repl = {}
-    for pos, n in DP.repl(nteams).items():
-        vs = sorted(by_pos.get(pos) or [], reverse=True)
-        repl[pos] = vs[n - 1] if len(vs) >= n else 0.0
-    adp_rows.sort(key=lambda t: (t[0], t[1]))
-    vor_order = []
-    for _adp_v, pid, pos, ppg in adp_rows:
-        if pos not in repl:
-            continue
-        vor_order.append(max(0.0, ppg - repl[pos]))
-    # FantasyPros overall ROS is an offensive list. Defenses and kickers sit on their own
-    # projection scale and are not used as the point value of an overall rank.
-    curve = sorted((ppg for pos, ppg in proj_ppg.values() if pos in ("QB", "RB", "WR", "TE")), reverse=True)
 
     played = []
     for pid, e in stat_rows.items():
@@ -501,10 +501,13 @@ def build(bundle, shared, players, drafts=None):
 
     rows = []
     ineligible = []
+    early = []
     for pid, roster in held.items():
         pos, name, team = _pos_name_team(pid, players, proj_rows.get(pid), stat_rows.get(pid))
         years = kept_seasons(drafts, pid)
         owner = _owner(users, roster)
+        if pos == "DEF":
+            continue
         if for_season is not None and not eligible(years, for_season):
             ineligible.append({
                 "name": name, "pos": pos or None, "owner": owner,
@@ -516,19 +519,22 @@ def build(bundle, shared, players, drafts=None):
             cost, how = None, None
         else:
             cost, how = keep_cost(None if rd is None else rd)
+        if how == "early":
+            early.append({
+                "name": name, "pos": pos or None, "owner": owner,
+                "round": int(rd),
+            })
+            continue
         if cost is None:
             continue
         st = (stat_rows.get(pid) or {}).get("stats")
         gp = games_played(st)
         pts = fantasy_points(scoring, st, pos) if st else None
-        perf = (pts / gp) if (pts is not None and gp) else None
-        proj = proj_ppg.get(pid)
-        proj_only = proj[1] if proj else None
         hit = ros.lookup(name, team, pos)
         overall, prosr = hit if hit else (None, None)
-        rank_ppg = curve[overall - 1] if overall and 1 <= overall <= len(curve) else None
-        expected = blend_expected(perf, gp, proj_only, rank_ppg)
-        value = surplus(expected, repl.get(pos), round_baseline(vor_order, nteams, cost))
+        sleeper_adp = _adp((proj_rows.get(pid) or {}).get("stats"), scoring)
+        slot = overall if isinstance(overall, int) and overall >= 1 else sleeper_adp
+        value = adp_discount(slot, cost, nteams)
         if value is None:
             continue
         shown_pts = _one(pts) if gp else None
@@ -556,7 +562,8 @@ def build(bundle, shared, players, drafts=None):
     for i, r in enumerate(rows, 1):
         r["rk"] = i
     ineligible.sort(key=lambda p: (p.get("name") or "", p.get("pos") or ""))
-    return {"rows": rows, "meta": _meta(for_season, scoring, page if ros_block else None, ineligible, notes)}
+    early.sort(key=lambda p: (p.get("name") or "", p.get("pos") or ""))
+    return {"rows": rows, "meta": _meta(for_season, scoring, page if ros_block else None, ineligible, notes, early)}
 
 
 def _scoring_label(scoring):
@@ -564,12 +571,13 @@ def _scoring_label(scoring):
     return {0.5: "Half PPR", 1.0: "PPR", 0.0: "Standard"}.get(rec, "%g PPR" % rec)
 
 
-def _meta(for_season, scoring, page, ineligible, notes):
+def _meta(for_season, scoring, page, ineligible, notes, early=None):
     return {
         "for_season": for_season,
         "scoring": _scoring_label(scoring),
         "ros_page": page,
         "ineligible": ineligible,
+        "early": early or [],
         "notes": notes,
     }
 

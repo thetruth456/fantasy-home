@@ -76,6 +76,8 @@ var dl=$("setup");if(dl){dl.innerHTML="";(M.setup||[]).forEach(function(r){var d
 var ht=$("keep-title"),K=M.keepers||{};if(ht&&K.for_season)ht.textContent="Top keepers for "+K.for_season;
 var foot=$("keep-foot");if(foot){foot.innerHTML="";var items=(K.notes||[]).slice();var inn=K.ineligible||[];
 if(inn.length)items.push("Ineligible (kept in both of the previous two seasons): "+inn.map(function(p){return p.name+" ("+(p.pos||"\u2014")+", "+(p.owner||"\u2014")+")"}).join("; ")+".");
+var early=K.early||[];
+if(early.length)items.push("Ineligible (drafted in the 1st or 2nd round): "+early.map(function(p){return p.name+" ("+(p.pos||"\u2014")+", "+(p.owner||"\u2014")+", round "+p.round+")"}).join("; ")+".");
 var src=M.sources||{};if(src.ros_asof)items.push("FantasyPros rest-of-season ranks as of "+src.ros_asof+".");
 foot.hidden=!items.length;items.forEach(function(t){var li=document.createElement("li");li.textContent=t;foot.appendChild(li)})}
 if(document.body.getAttribute("data-report")===key)document.title=M.title}

@@ -57,8 +57,10 @@ if (!keep.includes(">Cost<") || !keep.includes(">How<") || !keep.includes(">ROS<
 if ((keep.match(/<tr>/g) || []).length !== 9) fail("keeper table should be 1 header + 8 rows");
 if (!keep.includes("Quinn Sample") || !keep.includes("Rd 15") || !keep.includes("Waiver") || !keep.includes("WR3 (8)")) fail("keeper row missing");
 if (!keep.includes("\u2014")) fail("keeper dash missing");
-if (keep.includes("Jaxon Sample") || keep.includes("(you)") || keep.includes(">You<")) fail("keeper table leaked an ineligible name or a you label");
-if (foot.indexOf("Jaxon Sample") < 0 || foot.indexOf("North Sample") < 0) fail("ineligible footnote missing");
+if (keep.includes("Jaxon Sample") || keep.includes("Morgan Sample") || keep.includes("Parker Sample") || keep.includes("(you)") || keep.includes(">You<") || keep.includes("Rd 1<") || keep.includes(">Rd 2<")) fail("keeper table leaked an ineligible name or a you label");
+if (!keep.includes(">Rd 3<")) fail("3rd-round keeper missing");
+if (foot.indexOf("Jaxon Sample") < 0 || foot.indexOf("North Sample") < 0) fail("two-year footnote missing");
+if (foot.indexOf("Morgan Sample") < 0 || foot.indexOf("round 1") < 0 || foot.indexOf("Parker Sample") < 0 || foot.indexOf("round 2") < 0) fail("early-round footnote missing");
 if (ids["best-keep-title"].textContent.indexOf("2027") < 0) fail("keeper title missing season");
 if (keep.includes("odds")) fail("keeper table picked up an odds chart");
 console.log("render ok: 10 kickers, weather column, lineup banner, keeper table");
