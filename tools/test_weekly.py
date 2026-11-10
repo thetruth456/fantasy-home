@@ -17,6 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build  # noqa: E402
+import keepers  # noqa: E402
 import seal  # noqa: E402
 import sources  # noqa: E402
 import update  # noqa: E402
@@ -509,6 +510,14 @@ class Pages(unittest.TestCase):
                 self.assertIn('id="%s-kickers"' % k, text)
                 self.assertIn('id="%s-t-kick"' % k, text)
                 self.assertIn('id="%s-view-report" hidden' % k, text)
+                if k in ("best", "oops"):
+                    self.assertIn('id="%s-keepers"' % k, text)
+                    self.assertIn('id="%s-t-keep"' % k, text)
+                    self.assertLess(text.find('id="%s-waivers"' % k), text.find('id="%s-keepers"' % k))
+                    self.assertLess(text.find('id="%s-keepers"' % k), text.find('id="%s-league-setup"' % k))
+                else:
+                    self.assertNotIn('id="%s-keepers"' % k, text)
+                    self.assertNotIn('id="%s-t-keep"' % k, text)
             self.assertIn("(dome)", text)
             self.assertIn("(roof ?)", text)
         idx = (ROOT / "index.html").read_text()
@@ -546,17 +555,249 @@ class Privacy(unittest.TestCase):
         with self.assertRaises(seal.SealError):
             seal.Key("not-the-password", lock)
         obj = {"META": {"week": 9, "title": "Synthetic"}, "STARTERS": [], "BENCH": [], "WAIVER": [], "DEFENSE": [],
-               "KICKERS": [{"name": "WaiverTargetZZZ", "team": "GB", "wx": "(dome)", "pp": None}]}
+               "KICKERS": [{"name": "WaiverTargetZZZ", "team": "GB", "wx": "(dome)", "pp": None}],
+               "KEEPERS": [{"name": "KeeperTargetZZZ", "owner": "North Sample", "value": 1.0}]}
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "best-league-report.js"
             key.write(str(path), "REPORTS.best", obj)
             raw = path.read_bytes()
             self.assertNotIn(b"WaiverTargetZZZ", raw)
+            self.assertNotIn(b"KeeperTargetZZZ", raw)
             self.assertIn(b"window.LOCKED", raw)
             slot, got = key.open_text(path.read_text(encoding="utf-8"))
             self.assertEqual(slot, "REPORTS.best")
             self.assertEqual(got["KICKERS"][0]["wx"], "(dome)")
         self.assertTrue((ROOT / "tools" / "lock.json").exists())
+
+
+class Keepers(unittest.TestCase):
+    def test_cost_rules(self):
+        self.assertEqual(keepers.keep_cost(5), (3, "Rd 5"))
+        self.assertEqual(keepers.keep_cost(15), (9, "Rd 15"))
+        self.assertEqual(keepers.keep_cost(11), (9, "Rd 11"))
+        self.assertEqual(keepers.keep_cost(1), (1, "Rd 1"))
+        self.assertEqual(keepers.keep_cost(2), (1, "Rd 2"))
+        self.assertEqual(keepers.keep_cost(3), (1, "Rd 3"))
+        self.assertEqual(keepers.keep_cost(4), (2, "Rd 4"))
+        self.assertEqual(keepers.keep_cost(None), (9, "Waiver"))
+        self.assertEqual(keepers.keep_cost(0), (None, None))
+        self.assertEqual(keepers.keep_cost("nope"), (None, None))
+
+    def test_two_year_rule_is_not_a_hardcoded_name(self):
+        # Jaxon Smith-Njigba kept only in 2026 is still eligible. A different player kept
+        # in both 2025 and 2026 is not. The name does not decide it.
+        one = [{"season": "2026", "picks": [{"player_id": "jsn", "round": 5, "is_keeper": True}]}]
+        both = [
+            {"season": "2026", "picks": [{"player_id": "other", "round": 4, "is_keeper": True}]},
+            {"season": "2025", "picks": [{"player_id": "other", "round": 6, "is_keeper": True}]},
+        ]
+        gap = [
+            {"season": "2026", "picks": [{"player_id": "gap", "round": 9, "is_keeper": False}]},
+            {"season": "2025", "picks": [{"player_id": "gap", "round": 4, "is_keeper": True}]},
+            {"season": "2024", "picks": [{"player_id": "gap", "round": 6, "is_keeper": True}]},
+        ]
+        self.assertTrue(keepers.eligible(keepers.kept_seasons(one, "jsn"), 2027))
+        self.assertFalse(keepers.eligible(keepers.kept_seasons(both, "other"), 2027))
+        self.assertTrue(keepers.eligible(keepers.kept_seasons(gap, "gap"), 2027))
+        self.assertEqual(keepers.kept_seasons(one, "jsn"), {2026})
+
+    def test_this_years_round_includes_a_keeper_slot(self):
+        drafts = [
+            {"season": "2026", "picks": [{"player_id": "a", "round": 8, "is_keeper": True}]},
+            {"season": "2025", "picks": [{"player_id": "a", "round": 10, "is_keeper": False}]},
+        ]
+        self.assertEqual(keepers.draft_round(drafts, "a", "2026"), 8)
+        self.assertEqual(keepers.keep_cost(8), (6, "Rd 8"))
+        self.assertIsNone(keepers.draft_round(drafts, "waiver", "2026"))
+
+    def test_round_value_window_matches_the_draft_prior(self):
+        self.assertEqual(keepers.round_anchor(1, 12), 6)
+        self.assertEqual(keepers.round_anchor(5, 12), 54)
+        self.assertEqual(keepers.round_anchor(9, 12), 102)
+        values = list(range(20))
+        self.assertEqual(keepers.adp_window(values, 1), [0, 1, 2, 3])
+        self.assertEqual(keepers.adp_window(values, 6), [2, 3, 4, 5, 6, 7, 8])
+        self.assertAlmostEqual(keepers.round_baseline(values, 12, 1), sum(range(2, 9)) / 7)
+
+    def test_blend_and_scoring(self):
+        # gp 7, actual 18, projection 10 -> regressed 14. Rank-implied 14 -> expected 14.
+        self.assertAlmostEqual(keepers.blend_expected(18, 7, 10, 14), 14)
+        # no rest-of-season point value: the regressed number stands.
+        self.assertAlmostEqual(keepers.blend_expected(12, 8, 10, None), (8 * 12 + 7 * 10) / 15)
+        self.assertIsNone(keepers.blend_expected(None, None, None, None))
+        stats = {"rec": 4, "rec_yd": 40}
+        self.assertAlmostEqual(keepers.fantasy_points({"rec": 0.5, "rec_yd": 0.1}, stats, "WR"), 6)
+        self.assertAlmostEqual(keepers.fantasy_points({"rec": 1.0, "rec_yd": 0.1}, stats, "WR"), 8)
+        # a defense season line is published with gp 1; that must not become 100 points per game
+        self.assertAlmostEqual(keepers.projection_ppg({"sack": 1}, {"sack": 51, "gp": 1}, "DEF"), 3)
+        self.assertAlmostEqual(keepers.projection_ppg({"rec_yd": 0.1}, {"rec_yd": 170, "gp": 17}, "WR"), 1)
+        # a cheap starter's surplus beats an expensive star when the round gap is real
+        cheap = keepers.surplus(14, 8, 1)
+        star = keepers.surplus(20, 8, 11)
+        self.assertGreater(cheap, star)
+        self.assertAlmostEqual(cheap, 5)
+        self.assertAlmostEqual(star, 1)
+
+    def test_history_notes_document_conflicts_without_names(self):
+        drafts = [
+            {"season": "2026", "rounds": 15, "picks": [
+                {"player_id": "pid-a", "round": 12, "is_keeper": True},
+                {"player_id": "pid-b", "round": 12, "is_keeper": True},
+                {"player_id": "pid-c", "round": 8, "is_keeper": True},
+            ]},
+            {"season": "2025", "rounds": 15, "picks": [
+                {"player_id": "pid-c", "round": 10, "is_keeper": True},
+                {"player_id": "pid-a", "round": 14, "is_keeper": False},
+            ]},
+        ]
+        notes = " ".join(keepers.history_notes(drafts, "2026", {"draft_rounds": 3, "max_keepers": 2}))
+        self.assertIn("draft_rounds is 3", notes)
+        self.assertIn("15 rounds", notes)
+        self.assertIn("max_keepers is 2", notes)
+        self.assertIn("dropped by 2 in 1 of 1", notes)
+        self.assertIn("as late as round 12", notes)
+        self.assertIn("round 12", notes)
+        for word in ("pid-a", "pid-b", "pid-c"):
+            self.assertNotIn(word, notes)
+
+    def test_missing_draft_does_not_invent_waiver_costs(self):
+        pack = keepers.build(_bundle(["p1"]), {"proj": [], "stats": [], "ros": {}},
+                             {"p1": {"full_name": "Pat Sample", "position": "WR", "team": "GB"}}, drafts=[])
+        self.assertEqual(pack["rows"], [])
+        self.assertIn("not guessed", " ".join(pack["meta"]["notes"]))
+        self.assertEqual(pack["meta"]["ineligible"], [])
+
+    def test_table_ranks_value_and_drops_two_year_keepers(self):
+        pack = _keeper_pack()
+        rows = pack["rows"]
+        by = {r["name"]: r for r in rows}
+        self.assertEqual(len(rows), 24)
+        self.assertEqual(rows[0]["name"], "Player 010")
+        self.assertEqual(rows[0]["cost"], 9)
+        self.assertEqual(rows[0]["how"], "Rd 15")
+        self.assertGreater(by["Player 010"]["value"], by["Player 001"]["value"])
+        self.assertEqual(by["Player 001"]["cost"], 1)
+        self.assertEqual(by["Player 001"]["how"], "Rd 1")
+        self.assertEqual(by["Player 001"]["owner"], "South Sample")
+        self.assertEqual(by["Waiver Add"]["cost"], 9)
+        self.assertEqual(by["Waiver Add"]["how"], "Waiver")
+        self.assertEqual(by["Player 008"]["cost"], 6)
+        self.assertEqual(by["Player 008"]["how"], "Rd 8")
+        self.assertNotIn("Jaxon Smith-Njigba", by)
+        self.assertNotIn("Casey Keeper", by)
+        inn = {p["name"]: p for p in pack["meta"]["ineligible"]}
+        self.assertEqual(set(inn), {"Jaxon Smith-Njigba", "Casey Keeper"})
+        self.assertIn(2025, inn["Jaxon Smith-Njigba"]["seasons"])
+        self.assertIn(2026, inn["Jaxon Smith-Njigba"]["seasons"])
+        self.assertEqual(inn["Jaxon Smith-Njigba"]["owner"], "North Sample")
+        blob = " ".join(pack["meta"]["notes"])
+        self.assertIn("dropped by 2", blob)
+        self.assertNotIn("Jaxon", blob)
+        self.assertNotIn("Casey", blob)
+        self.assertEqual([r["rk"] for r in rows], list(range(1, 25)))
+        self.assertTrue(all("you" not in (r["owner"] or "").lower() for r in rows))
+
+    def test_only_best_and_oops_are_keeper_leagues(self):
+        self.assertTrue(keepers.enabled("best") and keepers.enabled("oops"))
+        self.assertFalse(keepers.enabled("zbt") or keepers.enabled("spacex"))
+        self.assertIsNone(keepers.extra_note("zbt"))
+        self.assertIsNone(keepers.extra_note("spacex"))
+        self.assertIn("previous two seasons", keepers.extra_note("best"))
+        self.assertEqual(keepers.ros_page({"rec": 0.5}), "ros-half-point-ppr-overall")
+        self.assertEqual(keepers.ros_page({"rec": 1}), "ros-ppr-overall")
+        self.assertIsNone(keepers.ros_page({"rec": 0}))
+        self.assertIn("KEEPERS", update.GROUPS)
+        src = (ROOT / "tools" / "update.py").read_text()
+        self.assertIn("keepers.enabled", src)
+
+    def test_reserve_and_taxi_count_as_rostered(self):
+        self.assertEqual(keepers.roster_player_ids({"players": ["a"], "reserve": ["b"], "taxi": ["a", "c"]}), ["a", "b", "c"])
+
+    def test_canon_sees_keeper_rows(self):
+        d = {"META": {"week": 9}, "STARTERS": [], "BENCH": [], "WAIVER": [], "DEFENSE": [], "KICKERS": []}
+        base = update.canon(d)
+        d["KEEPERS"] = [{"name": "Synthetic", "value": 1}]
+        self.assertNotEqual(update.canon(d), base)
+        d["KEEPERS"] = []
+        d["META"]["keepers"] = {"for_season": 2027}
+        self.assertNotEqual(update.canon(d), base)
+
+
+def _bundle(pids, users=None, rosters=None):
+    if rosters is None:
+        rosters = [{"roster_id": 1, "owner_id": "u1", "players": list(pids)}]
+    if users is None:
+        users = [{"user_id": "u1", "metadata": {"team_name": "North Sample"}, "display_name": "north"}]
+    return {
+        "league": {
+            "league_id": "L", "season": "2026", "name": "Synthetic", "total_rosters": 12,
+            "scoring_settings": {"rec": 0.5, "rec_yd": 0.1},
+            "settings": {"max_keepers": 2, "draft_rounds": 15},
+        },
+        "rosters": rosters,
+        "users": users,
+    }
+
+
+def _keeper_pack():
+    """150 synthetic WRs. Interesting ids are rostered; two keepers are ineligible."""
+    players, proj, stats, picks = {}, [], [], []
+    for i in range(150):
+        pid = "p%03d" % i
+        ppg = 40 - i * 0.5
+        players[pid] = {"full_name": "Player %03d" % i, "position": "WR", "team": "GB"}
+        proj.append({"player_id": pid, "team": "GB", "player": {"position": "WR", "full_name": "Player %03d" % i},
+                     "stats": {"gp": 17, "rec_yd": ppg * 17 / 0.1, "adp_half_ppr": i + 1}})
+    players["waiver"] = {"full_name": "Waiver Add", "position": "WR", "team": "KC"}
+    players["jsn"] = {"full_name": "Jaxon Smith-Njigba", "position": "WR", "team": "SEA"}
+    players["casey"] = {"full_name": "Casey Keeper", "position": "RB", "team": "DET"}
+    proj.append({"player_id": "waiver", "team": "KC", "player": {"position": "WR", "full_name": "Waiver Add"},
+                 "stats": {"gp": 17, "rec_yd": 12 * 17 / 0.1}})
+
+    def season_line(pid, perf, team):
+        stats.append({"player_id": pid, "team": team, "stats": {"gp": 8, "rec_yd": perf * 8 / 0.1}})
+
+    season_line("p010", 36, "GB")
+    season_line("p001", 39, "GB")
+    season_line("p008", 30, "GB")
+    season_line("waiver", 18, "KC")
+    season_line("jsn", 40, "SEA")
+    fillers = ["p%03d" % i for i in range(100, 130)]
+    north = ["p010", "waiver", "jsn"]
+    south = ["p001", "p008", "casey"] + fillers
+    users = [
+        {"user_id": "u1", "metadata": {"team_name": "North Sample"}, "display_name": "north"},
+        {"user_id": "u2", "metadata": {"team_name": "South Sample"}, "display_name": "south"},
+    ]
+    rosters = [
+        {"roster_id": 1, "owner_id": "u1", "players": north},
+        {"roster_id": 2, "owner_id": "u2", "players": south, "reserve": [], "taxi": []},
+    ]
+    picks_2026 = [
+        {"player_id": "p010", "round": 15, "is_keeper": False, "roster_id": 1},
+        {"player_id": "p001", "round": 1, "is_keeper": False, "roster_id": 9},
+        {"player_id": "p008", "round": 8, "is_keeper": True, "roster_id": 2},
+        {"player_id": "jsn", "round": 5, "is_keeper": True, "roster_id": 1},
+        {"player_id": "casey", "round": 7, "is_keeper": True, "roster_id": 2},
+    ]
+    picks_2025 = [
+        {"player_id": "jsn", "round": 7, "is_keeper": True, "roster_id": 1},
+        {"player_id": "casey", "round": 9, "is_keeper": True, "roster_id": 2},
+        {"player_id": "p008", "round": 10, "is_keeper": False, "roster_id": 2},
+    ]
+    drafts = [
+        {"season": "2026", "rounds": 15, "picks": picks_2026},
+        {"season": "2025", "rounds": 15, "picks": picks_2025},
+    ]
+    ros = {"players": [
+        {"player_name": "Player 010", "player_team_id": "GB", "rank_ecr": 1, "pos_rank": "WR1"},
+        {"player_name": "Player 001", "player_team_id": "GB", "rank_ecr": 20, "pos_rank": "WR12"},
+        {"player_name": "Player 008", "player_team_id": "GB", "rank_ecr": 5, "pos_rank": "WR4"},
+        {"player_name": "Waiver Add", "player_team_id": "KC", "rank_ecr": 2, "pos_rank": "WR2"},
+        {"player_name": "Jaxon Smith-Njigba", "player_team_id": "SEA", "rank_ecr": 3, "pos_rank": "WR3"},
+    ]}
+    shared = {"proj": proj, "stats": stats, "ros": {keepers.ROS_HALF: ros}}
+    return keepers.build(_bundle([], users, rosters), shared, players, drafts=drafts)
 
 
 def write_fixture_page(dest):
@@ -587,6 +828,15 @@ def write_fixture_page(dest):
 <section id="best-starters"><h2>Starters</h2><div class="scroll" id="best-t-starters"></div></section>
 <section id="best-bench"><h2>Bench</h2><div class="scroll" id="best-t-bench"></div></section>
 <section id="best-waivers"><h2>Waiver flex options</h2><p class="cap" id="best-wcap"></p><div class="scroll" id="best-t-waiver"></div></section>
+<section id="best-keepers"><h2 id="best-keep-title">Top keepers</h2>
+<ul class="cap method">
+<li>Cost is this year's draft round minus 2, including the round a player was already kept in. It is never earlier than the 1st or later than the 9th. A player who was not in this year's draft (waiver or free agency) costs a 9th. A trade does not change the round; the table shows whoever holds him now.</li>
+<li>A player kept in both of the previous two seasons is ineligible and is left off the ranking. That uses the keeper flags on this league's drafts. Names, when the history has them, are under the table.</li>
+<li>Value is expected points per game above a replacement player, minus the typical value of a pick in that keep round. Expected points average this year's scoring (pulled toward that player's Sleeper projection) and the Sleeper points of the same FantasyPros rest-of-season rank. The round's value is the ADP neighborhood of its middle pick. Best League uses the half-PPR rest-of-season ranks and this league's scoring. A dash means that input was missing.</li>
+</ul>
+<div class="scroll" id="best-t-keep"></div>
+<ul class="cap keep-foot" id="best-keep-foot" hidden></ul>
+</section>
 <section id="best-league-setup"><h2>League setup</h2><dl id="best-setup"></dl></section>
 <section id="best-data-notes"><h2>Data notes and sources</h2><ul id="best-notes"></ul></section>
 <p id="best-week" hidden></p>

@@ -1,4 +1,4 @@
-/* Shared report renderer. Each league file sets window.REPORTS[key] = {STARTERS, BENCH, WAIVER, DEFENSE, KICKERS}; call initReport(key). */
+/* Shared report renderer. Each league file sets window.REPORTS[key] = {STARTERS, BENCH, WAIVER, DEFENSE, KICKERS, KEEPERS}; call initReport(key). KEEPERS is Best League and Oopsilons only. */
 (function(){
 var COLS=["Slot","Player","Pos","Opponent","Prop-implied pts","Sleeper proj","FP rank","Status","Rush yds line","Rec yds line","Rec line","Anytime TD (DK)","Weather"];
 var DCOLS=["Slot","Player","Pos","Opponent","Prop-implied pts","Sleeper proj","FP rank","Status","Opp implied total","Game total (O/U)","Spread","Weather"];
@@ -35,6 +35,17 @@ var cells=[esc(it.label),esc(p.name+" \u00b7 "+p.team),esc(p.pos),esc(p.opp),pp,
 h+=tr(cells,KCOLS)});
 return h+"</tbody></table>"}
 function kickItems(rows){var L={K:"Starter",BN:"Bench",WAIVER:"FA"};return (rows||[]).map(function(p){return{p:p,label:L[p.slot]||p.slot}})}
+var PCOLS=["#","Player","Pos","Owner","Cost","How","ROS","2026 pts","Value"];
+function signed1(v){var n=Math.round(v*10)/10;if(n===0)n=0;return (n>0?"+":"")+n.toFixed(1)}
+function ptsText(p){if(p.pts==null)return "\u2014";var t=(Math.round(p.pts*10)/10).toFixed(1);return p.prank?t+" \u00b7 "+p.prank:t}
+function rosText(p){if(p.ros==null&&!p.prosr)return "\u2014";if(p.prosr&&p.ros!=null)return esc(p.prosr)+" ("+esc(p.ros)+")";if(p.prosr)return esc(p.prosr);return esc(p.ros)}
+function keepTable(rows){var n=rows.length,h="<table><thead><tr>"+PCOLS.map(function(c){return"<th>"+esc(c)+"</th>"}).join("")+"</tr></thead><tbody>";
+rows.forEach(function(p,i){var band=i<n/3?"success":i<2*n/3?"warning":"danger";
+var who=esc(p.nfl?p.name+" \u00b7 "+p.nfl:p.name);
+var val=p.value==null?"\u2014":pill(signed1(p.value),band);
+var cells=[esc(p.rk),who,esc(p.pos||"\u2014"),esc(p.owner||"\u2014"),esc(p.cost==null?"\u2014":p.cost),esc(p.how||"\u2014"),rosText(p),ptsText(p),val];
+h+="<tr>"+cells.map(function(c){return "<td>"+c+"</td>"}).join("")+"</tr>"});
+return h+"</tbody></table>"}
 function defItems(rows){var L={DEF:"Starter",BN:"Bench",WAIVER:"FA"};var mine=rows.filter(function(p){return p.slot!=="WAIVER"}).sort(byPP),fa=rows.filter(function(p){return p.slot==="WAIVER"}).sort(byPP);
 return mine.concat(fa).map(function(p){return{p:p,label:L[p.slot]||p.slot}})}
 window.initReport=function(key){
@@ -62,6 +73,11 @@ if(lu){var L=M.lineup;if(!L){lu.hidden=true}else{lu.hidden=false;var bad=(L.swap
 lu.textContent=bad.length?"Lineup not optimal: "+bad.join("; ")+".":"Lineup optimal"}}
 list("quick",M.quick||[]);list("notes",M.notes||[]);
 var dl=$("setup");if(dl){dl.innerHTML="";(M.setup||[]).forEach(function(r){var dt=document.createElement("dt"),dd=document.createElement("dd");dt.textContent=r[0];if(r[2]){dd.innerHTML=pill(r[1],"accent")}else dd.textContent=r[1];dl.appendChild(dt);dl.appendChild(dd)})}
+var ht=$("keep-title"),K=M.keepers||{};if(ht&&K.for_season)ht.textContent="Top keepers for "+K.for_season;
+var foot=$("keep-foot");if(foot){foot.innerHTML="";var items=(K.notes||[]).slice();var inn=K.ineligible||[];
+if(inn.length)items.push("Ineligible (kept in both of the previous two seasons): "+inn.map(function(p){return p.name+" ("+(p.pos||"\u2014")+", "+(p.owner||"\u2014")+")"}).join("; ")+".");
+var src=M.sources||{};if(src.ros_asof)items.push("FantasyPros rest-of-season ranks as of "+src.ros_asof+".");
+foot.hidden=!items.length;items.forEach(function(t){var li=document.createElement("li");li.textContent=t;foot.appendChild(li)})}
 if(document.body.getAttribute("data-report")===key)document.title=M.title}
 function draw(){var d=D(),STARTERS=d.STARTERS,BENCH=d.BENCH,WAIVER=d.WAIVER;text();
 $("t-starters").innerHTML=table(STARTERS.map(function(p){return{p:p,label:lab(p.slot)}}));
@@ -69,6 +85,7 @@ $("t-bench").innerHTML=table(BENCH.slice().sort(byPP).map(function(p){return{p:p
 $("t-waiver").innerHTML=table(WAIVER.slice().sort(byPP).map(function(p){return{p:p,label:"FA"}}));
 var dt=$("t-def");if(dt)dt.innerHTML=dtable(defItems(d.DEFENSE||[]));
 var kt=$("t-kick");if(kt)kt.innerHTML=ktable(kickItems(d.KICKERS||[]));
+var pk=$("t-keep");if(pk){var kr=d.KEEPERS||[];pk.innerHTML=kr.length?keepTable(kr):'<p class="cap">No keeper values this week.</p>'}
 render()}
 window.REDRAW=window.REDRAW||{};window.REDRAW[key]=draw;
 draw();

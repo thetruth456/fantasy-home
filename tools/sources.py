@@ -83,6 +83,22 @@ def sleeper_stats(season, week, season_type):
     return d if isinstance(d, list) else []
 
 
+def sleeper_season_stats(season):
+    """One season-to-date stat line per player (week is null; gp is games played so far)."""
+    d = get_json("%s/stats/nfl/%s?season_type=regular" % (SLEEPER, season), timeout=120)
+    if not isinstance(d, list) or len(d) < 1000:
+        raise RuntimeError("season stats look empty (%s)" % (len(d) if isinstance(d, list) else d))
+    return d
+
+
+def sleeper_season_projections(season):
+    """Full-season stat projections, including ADP. Scored later with each league's settings."""
+    d = get_json("%s/projections/nfl/%s?season_type=regular&%s&order_by=adp_half_ppr" % (SLEEPER, season, PROJ_POS), timeout=120)
+    if not isinstance(d, list) or len(d) < 500:
+        raise RuntimeError("season projections look empty (%s)" % (len(d) if isinstance(d, list) else d))
+    return d
+
+
 def sleeper_players(cache_dir, max_age_h=24):
     """The big players dump. Sleeper asks for at most one call a day, so keep a cache file."""
     os.makedirs(cache_dir, exist_ok=True)
@@ -148,14 +164,18 @@ def fetch_fieldwork(season, week):
 FP_PAGES = {"half-point-ppr-flex": 100, "ppr-flex": 100, "qb": 20, "k": 15, "dst": 15}
 
 
+def _ecr(html):
+    i = html.index("var ecrData = ")
+    return json.JSONDecoder().raw_decode(html[i + len("var ecrData = "):])[0]
+
+
 def fetch_fp(week):
     """Return {page: players} for each ranking page. Pages whose week differs from `week` are rejected."""
     out = {}
     for page, minimum in FP_PAGES.items():
         try:
             html = http_get("https://www.fantasypros.com/nfl/rankings/%s.php" % page, timeout=90)
-            i = html.index("var ecrData = ")
-            d = json.JSONDecoder().raw_decode(html[i + len("var ecrData = "):])[0]
+            d = _ecr(html)
             players = d.get("players") or []
             if len(players) < minimum:
                 raise RuntimeError("only %d players" % len(players))
@@ -165,6 +185,32 @@ def fetch_fp(week):
         except Exception as e:  # noqa: BLE001
             log("  FantasyPros %s unavailable: %s" % (page, e))
     return out
+
+
+def fetch_fp_ros(page, season):
+    """One FantasyPros rest-of-season ranking. Rejects a draft ranking or a different season.
+
+    Returns {players, scoring, updated, year, page}. Week is 0 on these pages and is not checked.
+    """
+    html = http_get("https://www.fantasypros.com/nfl/rankings/%s.php" % page, timeout=90)
+    d = _ecr(html)
+    kind = "%s %s" % (d.get("type") or "", d.get("ranking_type_name") or "")
+    if "ROS" not in kind.upper():
+        raise RuntimeError("not a rest-of-season ranking (%s)" % kind.strip())
+    year = d.get("year")
+    if year is not None and str(year) != str(season):
+        raise RuntimeError("FantasyPros ROS year is %s, not %s" % (year, season))
+    players = d.get("players") or []
+    if len(players) < 50:
+        raise RuntimeError("only %d players" % len(players))
+    scoring = str(d.get("scoring") or "").upper()
+    if "half" in page and "HALF" not in scoring:
+        raise RuntimeError("expected half-PPR, got %s" % (d.get("scoring"),))
+    if "half" not in page and "PPR" in scoring and "HALF" in scoring:
+        raise RuntimeError("expected PPR, got %s" % (d.get("scoring"),))
+    if "half" not in page and "ppr" in page and "PPR" not in scoring:
+        raise RuntimeError("expected PPR, got %s" % (d.get("scoring"),))
+    return {"players": players, "scoring": d.get("scoring"), "updated": d.get("last_updated"), "year": year, "page": page}
 
 
 # ---------------------------------------------------------------- game lines (ESPN public scoreboard, DraftKings odds)

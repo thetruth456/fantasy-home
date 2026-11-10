@@ -52,6 +52,14 @@ Each league has a Kickers table below Defense: your kickers (starter, then bench
 * Fieldwork does not post kicker markets. FG made and Kicking pts are the PrizePicks two-way over/under (standard line). Alternate "demon" and "goblin" prices, and over-only prices, are not used. Kicking points are 3 per field goal and 1 per extra point. When both lines are posted, extra points are kicking points minus 3 times field goals, and the field-goal line is spread across Sleeper's distance mix, then scored with this league's settings. A single line scales that Sleeper shape so the posted stat matches. Miss penalties are not in the markets and are not deducted. If a line is missing, or the two lines cannot be field goals and extra points, or Sleeper has no distance mix for an uneven league, that cell is a dash.
 * FP rank is the FantasyPros weekly kicker rank (`k.php`), colored inside this table only.
 
+### Top keepers (Best League and Oopsilons only)
+
+Best League and Oopsilons weekly reports have a Top keepers section after the waiver table and before league setup (`KEEPERS` in the data file, `<key>-t-keep` on the page). ZBT and SpaceX do not. It is the keep list for next season, from current rosters. The same `python tools/update.py` run fills it. The section stays inside the encrypted weekly report.
+
+* Cost is this year's draft round minus 2, never earlier than the 1st or later than the 9th. A player with no pick in that draft costs a 9th. A trade does not change the round. The round is the round on this year's pick, including a keeper pick, so a second keep is another two rounds cheaper. Sleeper's `max_keepers` is a per-team cap and is not this rule. If a completed draft kept someone later than the 9th, the table still caps the cost at 9 and says so under the table.
+* A player marked keeper in both of the previous two seasons is left off the ranking. The names are a footnote when the drafts say so. Nothing is hardcoded to one player.
+* Value is expected points per game above replacement, minus the typical value of the middle pick in that keep round (the same ADP window as `tools/draftprior.py`). Expected points average this year's scoring, shrunk toward that player's Sleeper projection, and the Sleeper points of the same FantasyPros rest-of-season rank. Best League uses `ros-half-point-ppr-overall`; Oopsilons uses `ros-ppr-overall`. A missing input is a dash, and a player with no surplus is omitted rather than scored as zero. The table shows at most 24.
+
 ### Weather column
 
 Every weekly-report player table (flex, defense, kickers, starters, bench, waivers) has a Weather column. It is the Open-Meteo model forecast for the kickoff hour, at the stadium on that week's ESPN schedule. It is not a station observation, including after the game has started. Neutral and international games use that stadium, not the home team's city. Both teams in a game share one forecast. Results are cached under `.cache/` for 45 minutes and requested in one batch per run.
@@ -124,7 +132,7 @@ Only the weekly reports (rosters, lineups, waivers) are behind a password. The w
 * `style.css`, `lock.js` (password gate and decryption), `report-core.js` (renders the tables and text), `refresh.js` (Refresh everything).
 * `podcast.js` (sub-tabs, luck report), `power.js` (Power Rankings and odds charts); data: `<key>-podcast-data.js`, `<key>-power-data.js` (plaintext snapshots from `tools/podcast.py` / `tools/power.py`).
 * `*-report.js`: generated data files. Do not edit by hand; changes are overwritten by the next run.
-* `tools/`: `update.py` (orchestration and gate), `sources.py` (Sleeper, Fieldwork, FantasyPros, ESPN fetchers), `build.py` (scoring, props, ranks, waiver list, text), `overrides.json`.
+* `tools/`: `update.py` (orchestration and gate), `sources.py` (Sleeper, Fieldwork, FantasyPros, ESPN fetchers), `build.py` (scoring, props, ranks, waiver list, text), `keepers.py` (Best League and Oopsilons top-keeper table), `overrides.json`.
 * `.github/workflows/update.yml`: the schedule.
 
 ## Week roll-over

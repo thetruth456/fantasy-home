@@ -46,4 +46,19 @@ if (!lineup || lineup.textContent.indexOf("Lineup optimal") < 0 || lineup.classN
 if (!/pill success">K1</.test(kick)) fail("kicker FP rank not colored");
 if (kick.includes("WaiverTarget")) fail("unexpected name");
 if ((bench.match(/<tr>/g) || []).length < 2) fail("bench table missing");
-console.log("render ok: 10 kickers, weather column, lineup banner");
+function textOf(id) {
+  const e = ids[id];
+  if (!e) return "";
+  const kids = (e.children || []).map(function (c) { return c.textContent || ""; }).join(" ");
+  return (e.textContent || "") + " " + kids;
+}
+const keep = has("best-t-keep"), foot = textOf("best-keep-foot");
+if (!keep.includes(">Cost<") || !keep.includes(">How<") || !keep.includes(">ROS<") || !keep.includes(">2026 pts<") || !keep.includes(">Value<")) fail("keeper columns missing");
+if ((keep.match(/<tr>/g) || []).length !== 9) fail("keeper table should be 1 header + 8 rows");
+if (!keep.includes("Quinn Sample") || !keep.includes("Rd 15") || !keep.includes("Waiver") || !keep.includes("WR3 (8)")) fail("keeper row missing");
+if (!keep.includes("\u2014")) fail("keeper dash missing");
+if (keep.includes("Jaxon Sample") || keep.includes("(you)") || keep.includes(">You<")) fail("keeper table leaked an ineligible name or a you label");
+if (foot.indexOf("Jaxon Sample") < 0 || foot.indexOf("North Sample") < 0) fail("ineligible footnote missing");
+if (ids["best-keep-title"].textContent.indexOf("2027") < 0) fail("keeper title missing season");
+if (keep.includes("odds")) fail("keeper table picked up an odds chart");
+console.log("render ok: 10 kickers, weather column, lineup banner, keeper table");

@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build  # noqa: E402
+import keepers  # noqa: E402
 import seal  # noqa: E402
 import sources as S  # noqa: E402
 import weather  # noqa: E402
@@ -38,7 +39,7 @@ LEAGUES = {
     "spacex": ("spacex-report.js", "1398902725940367360", "ppr-flex"),
 }
 TIME_FIELDS = ("generated", "asof", "sources")
-GROUPS = ("STARTERS", "BENCH", "WAIVER", "DEFENSE", "KICKERS")
+GROUPS = ("STARTERS", "BENCH", "WAIVER", "DEFENSE", "KICKERS", "KEEPERS")
 
 
 # ------------------------------------------------------------------ schedule gate
@@ -210,6 +211,16 @@ def main():
     ctx["kicker_props"] = kicker_props
     fresh_weather_asof = wx_result.asof if wx_result is not None else None
 
+    # Season-long inputs for the Best / Oopsilons keeper table. Counts only; names stay out of the log.
+    keeper_shared = None
+    try:
+        keeper_shared = keepers.load_shared(season)
+        log("keeper inputs: season stats %d, projections %d, ros pages %s" % (
+            len(keeper_shared["stats"]), len(keeper_shared["proj"]),
+            ", ".join(sorted(keeper_shared["ros"])) or "none"))
+    except Exception as e:  # noqa: BLE001
+        log("WARNING: keeper inputs unavailable (%s); Best and Oopsilons keep the previous keeper table" % e)
+
     changed, failed = [], []
     for key, (fn, lid, flex_page) in LEAGUES.items():
         path = os.path.join(out_dir, fn)
@@ -220,6 +231,8 @@ def main():
         prev_lines = {}
         if same_week:
             for g in GROUPS:
+                if g == "KEEPERS":  # no weekly prop cells; "team" there is the fantasy owner
+                    continue
                 for r in prev.get(g, []):
                     prev_rows[(r["name"], r["team"])] = r
             for r in prev.get("DEFENSE", []):  # last known line per team, used only if ESPN is down
@@ -236,14 +249,38 @@ def main():
             log("ERROR: league %s failed (%s); keeping its previous data" % (key, e))
             failed.append(key)
             continue
+        keeper_meta = None
+        if keepers.enabled(key):
+            prev_k = (prev or {}).get("KEEPERS") if same_week else None
+            prev_km = pm.get("keepers") if same_week else None
+            try:
+                if keeper_shared is None:
+                    raise RuntimeError("shared inputs unavailable")
+                pack = keepers.build(bundle, keeper_shared, players)
+                d["KEEPERS"] = pack["rows"]
+                keeper_meta = pack["meta"]
+            except Exception as e:  # noqa: BLE001
+                log("WARNING: keepers for %s failed (%s); keeping the previous table" % (key, e))
+                d["KEEPERS"] = list(prev_k or [])
+                keeper_meta = prev_km
+            log("        keepers: %d ranked, %d ineligible" % (
+                len(d.get("KEEPERS") or []), len((keeper_meta or {}).get("ineligible") or [])))
         m = d.pop("meta")
+        ros_asof = None
+        if keepers.enabled(key):
+            block = (keeper_shared or {}).get("ros", {}).get((keeper_meta or {}).get("ros_page")) if keeper_shared else None
+            ros_asof = (block or {}).get("updated") if block else (psrc.get("ros_asof") if same_week else None)
         sources = dict(
             proj_asof=proj_asof,
             props_asof=props_asof if props is not None else psrc.get("props_asof"),
             fp_asof=fp_asof if fp is not None else psrc.get("fp_asof"),
             lines_asof=lines_asof if lines is not None else (psrc.get("lines_asof") if prev_lines else None),
             weather_asof=fresh_weather_asof if fresh_weather_asof else (psrc.get("weather_asof") if same_week else None),
-            kicker_props_asof=kicker_props_asof if kicker_props is not None else (psrc.get("kicker_props_asof") if same_week else None))
+            kicker_props_asof=kicker_props_asof if kicker_props is not None else (psrc.get("kicker_props_asof") if same_week else None),
+            ros_asof=ros_asof)
+        notes = build.notes_for(d["STARTERS"] + d["BENCH"] + d["WAIVER"] + d.get("KICKERS", []) + d.get("DEFENSE", []), overrides, week)
+        if keepers.extra_note(key):
+            notes = list(notes) + [keepers.extra_note(key)]
         META = dict(
             key=key, week=week, season=season, season_type=stype, league_id=m["league_id"], name=m["name"],
             title="%s Week %d: roster, kickers, waiver flex options and prop tiebreakers" % (m["name"], week),
@@ -251,9 +288,11 @@ def main():
             quick=build.quick_read(d),
             wcap=build.waiver_caption(d["WAIVER"]),
             setup=build.setup_text(m, week),
-            notes=build.notes_for(d["STARTERS"] + d["BENCH"] + d["WAIVER"] + d.get("KICKERS", []) + d.get("DEFENSE", []), overrides, week),
+            notes=notes,
             scoring=m["scoring"], fp_page=flex_page, sources=sources,
             asof=build.asof_text(sources), generated=iso(now if os.environ.get("FH_NOW") else dt.datetime.now(dt.timezone.utc)))
+        if keeper_meta is not None:
+            META["keepers"] = keeper_meta
         d["META"] = META
         if canon(d) == canon(prev) and not force:
             log("%-7s no substantive change; leaving file as is" % key)
@@ -267,7 +306,7 @@ def main():
         rows = []
         for g in GROUPS:
             rows.extend(d.get(g) or [])
-        unranked = [r for r in rows if r["fp"] == build.DASH and r["status"] in ("Healthy", "Questionable") and r["pos"] in ("RB", "WR", "TE", "QB", "K", "DEF")]
+        unranked = [r for r in rows if r.get("fp") == build.DASH and r.get("status") in ("Healthy", "Questionable") and r.get("pos") in ("RB", "WR", "TE", "QB", "K", "DEF")]
         if unranked:
             log("        no FantasyPros rank for %d player(s) (names not logged: Actions logs are public)" % len(unranked))
         ks = d.get("KICKERS") or []

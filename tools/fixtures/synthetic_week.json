@@ -10,7 +10,15 @@
         "lineup": {"ok": true, "swaps": [], "issues": []},
         "quick": ["Synthetic quick read. No real roster is shown."],
         "notes": ["Weather: (dome) is indoor. (roof ?) is a retractable roof and the numbers are outdoor. (covered) is a canopy. Bye, no forecast, no obs, and a dash were not filled in."],
-        "setup": [["League", "Synthetic, 12 teams, 2026 season, Week 9", false], ["Scoring", "Half PPR", true]]
+        "setup": [["League", "Synthetic, 12 teams, 2026 season, Week 9", false], ["Scoring", "Half PPR", true]],
+        "sources": {"ros_asof": "11/09"},
+        "keepers": {
+          "for_season": 2027,
+          "scoring": "Half PPR",
+          "ros_page": "ros-half-point-ppr-overall",
+          "notes": ["Synthetic note only. Costs in this fixture are capped at the 9th."],
+          "ineligible": [{"name": "Jaxon Sample", "pos": "WR", "owner": "North Sample", "seasons": [2025, 2026]}]
+        }
       },
       "STARTERS": [
         {"slot": "WR1", "name": "Riley Sample", "pos": "WR", "team": "GB", "opp": "at MIN (Sun)", "status": "Healthy", "proj": "14.2", "pn": 14.2, "pp": 16.4, "fp": "12", "rush": "\u2014", "rec": "71.5", "recs": "5.5", "atd": "-115", "atdr": "", "wx": "42\u00b0F, 11 mph, Snow, Green Bay"},
@@ -37,6 +45,16 @@
         {"slot": "WAIVER", "name": "Harper Sample", "pos": "K", "team": "BAL", "opp": "vs JAX (Thu)", "status": "Played", "proj": "9.0 final", "pn": 9, "pp": null, "fp": "K9", "wx": "71\u00b0F, 5 mph, Overcast (final)"},
         {"slot": "WAIVER", "name": "Indigo Sample", "pos": "K", "team": "KC", "opp": "vs NYJ (Sun)", "status": "Healthy", "proj": "7.2", "pn": 7.2, "pp": null, "fp": "K10", "wx": "55\u00b0F, 10 mph, Clear (kickoff)"},
         {"slot": "WAIVER", "name": "Jules Sample", "pos": "K", "team": "PHI", "opp": "vs NYG (Sun)", "status": "Healthy", "proj": "6.4", "pn": 6.4, "pp": null, "fp": "K14", "wx": "no obs"}
+      ],
+      "KEEPERS": [
+        {"rk": 1, "name": "Quinn Sample", "pos": "WR", "nfl": "GB", "owner": "North Sample", "cost": 9, "how": "Rd 15", "ros": 8, "prosr": "WR3", "pts": 142.4, "prank": "WR6", "value": 6.4},
+        {"rk": 2, "name": "Reese Sample", "pos": "RB", "nfl": "DET", "owner": "East Sample", "cost": 9, "how": "Waiver", "ros": 18, "prosr": "RB8", "pts": 128.0, "prank": "RB9", "value": 5.1},
+        {"rk": 3, "name": "Avery Sample", "pos": "WR", "nfl": "MIN", "owner": "South Sample", "cost": 6, "how": "Rd 8", "ros": 24, "prosr": "WR11", "pts": 119.5, "prank": "WR12", "value": 3.4},
+        {"rk": 4, "name": "Blake Sample", "pos": "QB", "nfl": "KC", "owner": "West Sample", "cost": 1, "how": "Rd 1", "ros": 4, "prosr": "QB2", "pts": 210.0, "prank": "QB2", "value": 1.2},
+        {"rk": 5, "name": "Casey Sample", "pos": "TE", "nfl": "SF", "owner": "North Sample", "cost": 3, "how": "Rd 5", "ros": null, "prosr": null, "pts": 96.2, "prank": "TE4", "value": 0.8},
+        {"rk": 6, "name": "Drew Sample", "pos": "RB", "nfl": "PHI", "owner": "East Sample", "cost": 1, "how": "Rd 2", "ros": 2, "prosr": "RB2", "pts": null, "prank": null, "value": 0.4},
+        {"rk": 7, "name": "Eden Sample", "pos": "WR", "nfl": "DAL", "owner": "South Sample", "cost": 9, "how": "Rd 11", "ros": 70, "prosr": "WR30", "pts": 61.0, "prank": "WR41", "value": -0.6},
+        {"rk": 8, "name": "Finley Sample", "pos": "QB", "nfl": "BUF", "owner": "West Sample", "cost": 4, "how": "Rd 6", "ros": null, "prosr": null, "pts": null, "prank": null, "value": -1.5}
       ]
     }
   }
