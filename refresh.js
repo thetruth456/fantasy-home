@@ -24,7 +24,8 @@ var fbtn=document.getElementById("full-btn"),panel=document.getElementById("toke
 input=document.getElementById("token-input"),cancel=document.getElementById("token-cancel"),tmsg=document.getElementById("token-msg"),clr=document.getElementById("token-clear");
 if(!fbtn)return;
 function tok(){try{return localStorage.getItem(TOKEN_KEY)||""}catch(e){return""}}
-function setTok(v){try{if(v)localStorage.setItem(TOKEN_KEY,v);else localStorage.removeItem(TOKEN_KEY)}catch(e){}syncClear()}
+function setTok(v){try{if(v)localStorage.setItem(TOKEN_KEY,v);else localStorage.removeItem(TOKEN_KEY)}catch(e){}syncClear();try{window.dispatchEvent(new Event("fh-token"))}catch(e){}}
+window.addEventListener("fh-token",syncClear);
 function syncClear(){if(clr)clr.hidden=!tok()}
 function openPanel(m){if(!panel)return;tmsg.textContent=m||"";panel.hidden=false;input.value="";input.focus()}
 function closePanel(){if(panel)panel.hidden=true}

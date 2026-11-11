@@ -1,0 +1,89 @@
+name: Refresh power rankings and luck
+
+# On-demand only. The Refresh button on the Power Rankings and Luck tabs
+# dispatches this workflow. It rewrites the eight public snapshots and
+# leaves the encrypted weekly reports alone.
+#
+# Model settings stay as the tools already have them: Best League is frozen
+# in tools/leagues.py, and the other leagues use tools/power_cal.json.
+# A week counts as complete only when every NFL game is final
+# (tools/sources.py week_final), which the two tools already apply.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: fantasy-rankings-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r tools/requirements.txt
+
+      - name: Today's date (cache key)
+        id: day
+        run: echo "d=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Sleeper players dump (about 10 MB, one new copy per day)
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: players-${{ steps.day.outputs.d }}
+          restore-keys: players-
+
+      - name: Regenerate power rankings and luck
+        run: |
+          python tools/podcast.py --league all
+          python tools/power.py --league all
+
+      - name: Commit and push if those snapshots changed
+        id: commit
+        run: |
+          git config user.name "fantasy-data-bot"
+          git config user.email "fantasy-data-bot@users.noreply.github.com"
+          git add -- \
+            best-power-data.js best-podcast-data.js \
+            zbt-power-data.js zbt-podcast-data.js \
+            oops-power-data.js oops-podcast-data.js \
+            spacex-power-data.js spacex-podcast-data.js
+          extra=$(git diff --cached --name-only | grep -vxE '(best|zbt|oops|spacex)-(power|podcast)-data\.js' || true)
+          if [ -n "$extra" ]; then
+            echo "Refusing to commit unexpected files:" >&2
+            printf '%s\n' "$extra" >&2
+            exit 1
+          fi
+          if git diff --cached --quiet; then
+            echo "No power or luck change, nothing to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m "Refresh power rankings and luck $(date -u +'%Y-%m-%d %H:%M UTC')"
+          for i in 1 2 3; do
+            if git push; then
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Push rejected (attempt $i); rebasing and retrying"
+            git pull --rebase -X theirs origin "${GITHUB_REF_NAME}"
+          done
+          echo "Could not push after 3 attempts" >&2
+          exit 1
+
+      - name: Ask GitHub Pages to rebuild (best effort)
+        if: steps.commit.outputs.changed == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${GITHUB_REPOSITORY}/pages/builds"

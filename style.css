@@ -87,7 +87,26 @@ footer{max-width:1400px;margin:0 auto;padding:0 16px 32px;color:var(--mut);font-
 .refresh-status.busy{color:#fff3c4}
 .refresh-status.err{color:#ffd6d6;font-weight:600}
 @media(max-width:600px){.site{position:static}.refresh{margin-left:0;width:100%;align-items:flex-start}.rbtns{justify-content:flex-start}.refresh .refresh-status{max-width:none;text-align:left}}
-@media print{.refresh,.token-panel{display:none}}
+@media print{.refresh,.token-panel,.rankbar,.rank-token{display:none}}
+/* on-demand refresh for Power Rankings and Luck (visible while the weekly report is locked) */
+.rankbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 12px}
+.rankbar .refresh-btn{border-color:#d4a000}
+.rank-status{font-size:13px;color:var(--mut);line-height:1.35;flex:1 1 16rem}
+.rank-status:empty{display:none}
+.rank-status.ok{color:#0f6b3f;font-weight:600}
+.rank-status.busy{color:#8a5a00}
+.rank-status.err{color:var(--r);font-weight:600}
+.rankbar .linkbtn{color:var(--acc-text)}
+.rank-token{background:#f4faf6;color:#1b2b21;border-bottom:1px solid #cfe5d8}
+.rank-token[hidden]{display:none}
+.rank-token .tin{max-width:760px;margin:0 auto;padding:12px 16px;font-size:14px;line-height:1.45}
+.rank-token p{margin:6px 0}
+.rank-token ol{margin:6px 0 10px;padding-left:20px}
+.rank-token a{color:#0b5d2e}
+.rank-token form{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.rank-token input{flex:1 1 240px;min-width:0;font:inherit;font-size:14px;padding:7px 10px;border:1px solid #9bc2ab;border-radius:8px}
+.rank-token .linkbtn{color:#0b5d2e}
+.rank-token .refresh-btn{border-color:#d4a000}
 
 /* sub-tabs (Best League: Weekly report | Podcast) */
 .subtabs{display:inline-flex;border:2px solid var(--acc);border-radius:999px;overflow:hidden;background:#fff;margin:0 0 14px}

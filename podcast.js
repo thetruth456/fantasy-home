@@ -1,5 +1,6 @@
 /* "Podcast" luck report, one league per data file (<key>-podcast-data.js, tools/podcast.py --league KEY).
-   Independent of report-core.js / refresh.js: the update workflow and "Refresh everything" never touch it. */
+   The hourly update and "Refresh everything" do not touch it.
+   Refresh on this tab runs the rankings workflow for all four leagues. */
 (function(){
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]})}
 function f1(v){return (Math.round(v*10)/10).toFixed(1)}
@@ -25,7 +26,7 @@ function gms(n){return n+' game'+(n===1?'':'s')}
 var wk=D.weeks[0]===D.weeks[1]?"Week "+D.weeks[0]:"Weeks "+D.weeks[0]+"\u2013"+D.weeks[1];
 var h=[];
 h.push('<h1>'+esc(D.title||"Best League")+' luck report: '+wk+'</h1>');
-h.push('<p class="asof">Snapshot as of '+esc(ptTime(D.asof))+'.'+(window.PODCAST_STANDALONE?'':' Not changed by the hourly update or Refresh everything.')+'</p>');
+h.push('<p class="asof">Snapshot as of '+esc(ptTime(D.asof))+'.'+(window.PODCAST_STANDALONE?'':' Use Refresh to regenerate all four leagues. The hourly update does not change this view.')+'</p>');
 
 /* ---- headlines */
 var lucky=T[0],unlucky=T[T.length-1];
