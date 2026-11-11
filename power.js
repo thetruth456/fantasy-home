@@ -1,5 +1,6 @@
 /* "Podcast: Power Rankings", one league per data file (<key>-power-data.js, tools/power.py --league KEY).
-   Rendered by initPodcast in podcast.js; the update workflow and "Refresh everything" never touch it. */
+   Rendered by initPodcast in podcast.js. The hourly update and "Refresh everything" do not touch it.
+   Refresh on this tab runs the rankings workflow for all four leagues. */
 (function(){
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]})}
 function f1(v){return (Math.round(v*10)/10).toFixed(1)}
@@ -96,7 +97,7 @@ function note(t){
  return "Playing spoiler"}
 var h=[];
 h.push('<h1>'+esc(TITLE)+' power rankings: Week '+D.cur+'</h1>');
-h.push('<p class="asof">Snapshot as of '+esc(ptTime(D.asof))+'.'+(window.PODCAST_STANDALONE?'':' Not changed by the hourly update or Refresh everything.')+'</p>');
+h.push('<p class="asof">Snapshot as of '+esc(ptTime(D.asof))+'.'+(window.PODCAST_STANDALONE?'':' Use Refresh to regenerate all four leagues. The hourly update does not change this view.')+'</p>');
 
 /* ---- odds through the season first (chart, toggle, legend, then how the odds are built) */
 h.push(oddsChart(D));

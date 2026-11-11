@@ -18,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build  # noqa: E402
 import keepers  # noqa: E402
+import leagues  # noqa: E402
 import seal  # noqa: E402
 import sources  # noqa: E402
 import update  # noqa: E402
@@ -894,6 +895,66 @@ initReport("best");
 """ % json.dumps(data["REPORTS"])
     (dest / "index.html").write_text(html)
     return dest / "index.html"
+
+
+class RankingsRefresh(unittest.TestCase):
+    def test_week_counts_only_when_every_game_is_final(self):
+        orig = sources.sleeper_scores
+        try:
+            sources.sleeper_scores = lambda season, week: []
+            self.assertFalse(sources.week_final("2026", 10))
+            sources.sleeper_scores = lambda season, week: [{"status": "complete"}, {"status": "in_progress"}]
+            self.assertFalse(sources.week_final("2026", 10))
+            sources.sleeper_scores = lambda season, week: [
+                {"status": "complete"},
+                {"status": "in_progress", "metadata": {"is_over": True}},
+            ]
+            self.assertTrue(sources.week_final("2026", 10))
+            sources.sleeper_scores = lambda season, week: [{"status": "complete"}, {"status": "complete"}]
+            self.assertTrue(sources.week_final("2026", 10))
+        finally:
+            sources.sleeper_scores = orig
+        for name in ("power.py", "podcast.py"):
+            self.assertIn("S.week_final(", (ROOT / "tools" / name).read_text())
+
+    def test_all_four_leagues_and_best_stays_frozen(self):
+        argv = ["--league", "all"]
+        got = leagues.pick(argv)
+        self.assertEqual([x["key"] for x in got], ["best", "zbt", "oops", "spacex"])
+        self.assertEqual(argv, [])
+        self.assertEqual(leagues.FROZEN["best"]["tau0"], 4.6)
+        self.assertEqual(leagues.FROZEN["best"]["injuries"], "oct31")
+
+    def test_rankings_workflow_commits_only_the_eight_snapshots(self):
+        text = (ROOT / ".github/workflows/rankings.yml").read_text()
+        self.assertIn("workflow_dispatch:", text)
+        self.assertNotIn("schedule:", text)
+        self.assertIn("python tools/podcast.py --league all\n", text)
+        self.assertIn("python tools/power.py --league all\n", text)
+        self.assertNotIn("python tools/update.py", text)
+        self.assertNotIn("python tools/seal.py", text)
+        self.assertNotIn("FH_REPORT_PASSWORD", text)
+        self.assertNotIn("FH_POWER_TAU0", text)
+        for name in ("best-league-report.js", "zbt-report.js", "oopsilons-report.js", "spacex-report.js", "tools/lock.json"):
+            self.assertNotIn(name, text)
+        for name in ("best-power-data.js", "best-podcast-data.js", "zbt-power-data.js", "zbt-podcast-data.js",
+                      "oops-power-data.js", "oops-podcast-data.js", "spacex-power-data.js", "spacex-podcast-data.js"):
+            self.assertIn(name, text)
+        self.assertIn("git push", text)
+        self.assertIn("grep -vxE", text)
+
+    def test_pages_load_rank_refresh_on_power_and_luck(self):
+        for fn in ("index.html", "best-league.html", "zbt.html", "oopsilons.html", "spacex-ff.html"):
+            text = (ROOT / fn).read_text()
+            self.assertIn('<script src="refresh-rank.js"></script>', text)
+            self.assertLess(text.find('src="power.js"'), text.find('src="refresh-rank.js"'))
+            self.assertLess(text.find('data-v="power"'), text.find('data-v="podcast"'))
+            self.assertLess(text.find('data-v="podcast"'), text.find('data-v="report"'))
+
+    def test_rank_refresh_script(self):
+        r = subprocess.run(["node", str(ROOT / "tools" / "test_rank_refresh.js")], cwd=str(ROOT), capture_output=True, text=True)
+        if r.returncode != 0:
+            self.fail(r.stdout + "\n" + r.stderr)
 
 
 if __name__ == "__main__":
