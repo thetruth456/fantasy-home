@@ -35,15 +35,16 @@ var cells=[esc(it.label),esc(p.name+" \u00b7 "+p.team),esc(p.pos),esc(p.opp),pp,
 h+=tr(cells,KCOLS)});
 return h+"</tbody></table>"}
 function kickItems(rows){var L={K:"Starter",BN:"Bench",WAIVER:"FA"};return (rows||[]).map(function(p){return{p:p,label:L[p.slot]||p.slot}})}
-var PCOLS=["#","Player","Pos","Owner","Cost","How","ROS","2026 pts","Value"];
+var PCOLS=["#","Player","Pos","Owner","Cost","How","Years left","ROS","2026 pts","Value"];
 function signed1(v){var n=Math.round(v*10)/10;if(n===0)n=0;return (n>0?"+":"")+n.toFixed(1)}
 function ptsText(p){if(p.pts==null)return "\u2014";var t=(Math.round(p.pts*10)/10).toFixed(1);return p.prank?t+" \u00b7 "+p.prank:t}
 function rosText(p){if(p.ros==null&&!p.prosr)return "\u2014";if(p.prosr&&p.ros!=null)return esc(p.prosr)+" ("+esc(p.ros)+")";if(p.prosr)return esc(p.prosr);return esc(p.ros)}
+function yearsText(p){var n=p.years_left;if(n!==0&&n!==1&&n!==2)return "\u2014";return esc(n)}
 function keepTable(rows){var n=rows.length,h="<table><thead><tr>"+PCOLS.map(function(c){return"<th>"+esc(c)+"</th>"}).join("")+"</tr></thead><tbody>";
 rows.forEach(function(p,i){var band=i<n/3?"success":i<2*n/3?"warning":"danger";
 var who=esc(p.nfl?p.name+" \u00b7 "+p.nfl:p.name);
 var val=p.value==null?"\u2014":pill(signed1(p.value),band);
-var cells=[esc(p.rk),who,esc(p.pos||"\u2014"),esc(p.owner||"\u2014"),esc(p.cost==null?"\u2014":p.cost),esc(p.how||"\u2014"),rosText(p),ptsText(p),val];
+var cells=[esc(p.rk),who,esc(p.pos||"\u2014"),esc(p.owner||"\u2014"),esc(p.cost==null?"\u2014":p.cost),esc(p.how||"\u2014"),yearsText(p),rosText(p),ptsText(p),val];
 h+="<tr>"+cells.map(function(c){return "<td>"+c+"</td>"}).join("")+"</tr>"});
 return h+"</tbody></table>"}
 function defItems(rows){var L={DEF:"Starter",BN:"Bench",WAIVER:"FA"};var mine=rows.filter(function(p){return p.slot!=="WAIVER"}).sort(byPP),fa=rows.filter(function(p){return p.slot==="WAIVER"}).sort(byPP);

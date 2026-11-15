@@ -15,8 +15,11 @@ Cost, from this league's most recent completed draft (Sleeper `is_keeper` picks 
   which is the same step. The 9th-round cap is applied even when a draft kept someone later.
 
 Ineligible, and left off the ranking: a player kept in both of the two seasons before
-the target season, and a player whose pick this year is in the 1st or 2nd round.
-Those two lists are separate. A name is never hardcoded.
+the target season (0 years left), and a player whose pick this year is in the 1st or
+2nd round. Those two lists are separate. A name is never hardcoded.
+Years left, on each ranked row only: 2 when he was not a keeper in the most recent
+completed draft (never kept, or last kept before that year). 1 when he was a keeper
+in that draft but not the year before. A 0 is not written back onto the top 24.
 
 Value is the draft-slot discount, in picks:
   middle pick of the keep round, minus where he would be drafted today.
@@ -49,7 +52,8 @@ DATA_NOTE = (
     "Cost is this year's draft round minus 2. A 3rd-round pick costs a 1st, and that is the earliest keep. "
     "A 1st- or 2nd-round pick cannot be kept. The latest cost is a 9th. "
     "A player who was not in this year's draft costs a 9th. "
-    "Players kept in both of the previous two seasons are left off. "
+    "Years left is 2 when he was not a keeper in this year's draft, and 1 when he was kept this year but not the year before. "
+    "Players kept in both of the previous two seasons have 0 years left and are left off. "
     "Value is the pick discount: the middle of the keep round minus his FantasyPros rest-of-season rank (Sleeper ADP if that rank is missing). "
     "Defenses are not keepers."
 )
@@ -143,13 +147,30 @@ def kept_seasons(drafts, player_id):
     return years
 
 
-def eligible(seasons, for_season):
-    """False when the player was a keeper in both of the two seasons before for_season."""
+def years_left(seasons, for_season):
+    """How many more seasons he can be kept, counting for_season.
+
+    2 when he was not a keeper in the most recent completed season. 1 when he was a
+    keeper that season but not the season before it. 0 when he was a keeper in both,
+    so he cannot be kept again. None when for_season is not a year. Only those two
+    seasons count; a gap resets the run.
+    """
     try:
         year = int(for_season)
     except (TypeError, ValueError):
-        return True
-    return not ({year - 1, year - 2} <= set(seasons or []))
+        return None
+    kept = set(seasons or [])
+    if {year - 1, year - 2} <= kept:
+        return 0
+    if (year - 1) in kept:
+        return 1
+    return 2
+
+
+def eligible(seasons, for_season):
+    """False when the player was a keeper in both of the two seasons before for_season."""
+    left = years_left(seasons, for_season)
+    return left is None or left > 0
 
 
 def draft_round(drafts, player_id, season):
@@ -550,6 +571,7 @@ def build(bundle, shared, players, drafts=None):
             "pts": shown_pts,
             "prank": pranks.get(pid) if shown_pts is not None else None,
             "value": _one(value),
+            "years_left": years_left(years, for_season),
         })
     rows.sort(key=lambda r: (
         -(r["value"] if r["value"] is not None else -10 ** 9),
