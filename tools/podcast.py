@@ -180,6 +180,134 @@ def get(path):
     return S.get_json(S.SLEEPER + path)
 
 
+def final_weeks(sched, weeks):
+    """Weeks in `weeks` whose NFL games are all final on the Sleeper schedule. A week with no games is not final."""
+    by = {}
+    for g in sched or []:
+        by.setdefault(g.get("week"), []).append(g)
+    out = []
+    for w in weeks:
+        gs = by.get(w) or []
+        if gs and all(g.get("status") == "complete" for g in gs):
+            out.append(w)
+    return out
+
+
+def schedule_swap(scores, pairs):
+    """Each team's record on each team's schedule.
+
+    scores: {week: {roster: points}}. pairs: {week: [(a, b), ...]}.
+    The row team keeps its own score. The column is whose schedule. A week the
+    column team played the row team is skipped, because a team cannot play itself.
+    The diagonal is the team's own schedule, which is its real record.
+    Returns {row: {column: [wins, losses, ties]}}.
+    """
+    rids = sorted({r for sc in scores.values() for r in sc})
+    opp = {}
+    for w, ps in pairs.items():
+        for a, b in ps:
+            opp[(w, a)] = b
+            opp[(w, b)] = a
+    out = {r: {} for r in rids}
+    for row in rids:
+        for col in rids:
+            wns = ls = ts = 0
+            for week, sc in scores.items():
+                other = opp.get((week, col))
+                if other is None or other == row or row not in sc or other not in sc:
+                    continue
+                if sc[row] > sc[other]:
+                    wns += 1
+                elif sc[row] < sc[other]:
+                    ls += 1
+                else:
+                    ts += 1
+            out[row][col] = [wns, ls, ts]
+    return out
+
+
+def allplay(scores):
+    """Record if each team played every other team in every week of `scores`.
+
+    Returns {roster: [wins, losses, ties]}. A team missing from a week does not
+    play that week. Pass only weeks whose games are all final.
+    """
+    rids = sorted({r for sc in scores.values() for r in sc})
+    out = {r: [0, 0, 0] for r in rids}
+    for sc in scores.values():
+        present = [r for r in rids if r in sc]
+        for r in present:
+            for o in present:
+                if o == r:
+                    continue
+                if sc[r] > sc[o]:
+                    out[r][0] += 1
+                elif sc[r] < sc[o]:
+                    out[r][1] += 1
+                else:
+                    out[r][2] += 1
+    return out
+
+
+_FLEX_SLOTS = {"FLEX", "SUPER_FLEX", "REC_FLEX", "WRRB_FLEX", "IDP_FLEX"}
+
+
+def bench_gap(slots, lineup_fn, matchups, pos_of):
+    """Season sums of bench points and the optimal-lineup gap.
+
+    Left on the bench = points scored by rostered players who did not start.
+    Optimal = the best legal lineup from that week's roster points (`lineup_fn`
+    is power.lineup: fixed slots, then flex). Actual = the matchup's points.
+    Gap = optimal minus actual. A starter whose position is missing keeps the
+    slot's position when that slot is not a flex, so the actual lineup can be
+    rebuilt. A player with no position still cannot fill a slot.
+    Returns {roster: {left, opt, actual, gap}} as floats.
+    """
+    acc = {}
+    for m in matchups:
+        rid = m.get("roster_id")
+        if rid is None:
+            continue
+        started, slot_pos = [], {}
+        for i, pid in enumerate(m.get("starters") or []):
+            if not pid or pid == "0":
+                continue
+            pid = str(pid)
+            started.append(pid)
+            slot = slots[i] if i < len(slots) else ""
+            known = pos_of(pid) or ""
+            if not known and slot and slot not in _FLEX_SLOTS:
+                known = slot
+            slot_pos[pid] = known
+        started_set = set(started)
+        pts = {}
+        for pid, v in (m.get("players_points") or {}).items():
+            try:
+                pts[str(pid)] = float(v or 0)
+            except (TypeError, ValueError):
+                pts[str(pid)] = 0.0
+        roster = [str(pid) for pid in (m.get("players") or []) if pid and pid != "0"]
+        seen, ids = set(), []
+        for pid in roster + started:
+            if pid not in seen:
+                seen.add(pid)
+                ids.append(pid)
+        left = sum(pts.get(pid, 0.0) for pid in roster if pid not in started_set)
+        cands = [(pts.get(pid, 0.0), slot_pos.get(pid) or pos_of(pid) or "", pid) for pid in ids]
+        opt = float(lineup_fn(slots, cands)[0])
+        try:
+            actual = float(m.get("points") or 0)
+        except (TypeError, ValueError):
+            actual = 0.0
+        a = acc.setdefault(rid, dict(left=0.0, opt=0.0, actual=0.0))
+        a["left"] += left
+        a["opt"] += opt
+        a["actual"] += actual
+    for a in acc.values():
+        a["gap"] = a["opt"] - a["actual"]
+    return acc
+
+
 def main(lg, last_arg=None):
     LEAGUE, KEY = lg["id"], lg["key"]
     OUT = out_path(KEY, "podcast")
@@ -435,9 +563,21 @@ def main(lg, last_arg=None):
     for i, r in enumerate(rows):
         r["rank"] = i + 1
     close = sorted(games, key=lambda g: abs(g["pa"] - g["pb"]))[:6]
+    fw = final_weeks(sched, weeks)
+    scf = {w: scores[w] for w in fw}
+    prs = {w: [(g["a"], g["b"]) for g in games if g["week"] == w] for w in fw}
+    swapped = schedule_swap(scf, prs)
+    played_all = allplay(scf)
+
+    def pos_of(pid):
+        return (P.get(str(pid)) or {}).get("position") or ""
+    benched = bench_gap(slots, lineup, [m for w in fw for m in M[w]], pos_of)
     now = datetime.datetime.now(datetime.timezone.utc)
     data = dict(key=KEY, title=lg["name"], season=season, weeks=[weeks[0], weeks[-1]], league=L["name"], asof=now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                close_margin=CLOSE, decay=DECAY, cur=cur, end=end, teams=rows, players=players, trades=trades, close=close, games=games)
+                close_margin=CLOSE, decay=DECAY, cur=cur, end=end, teams=rows, players=players, trades=trades, close=close, games=games,
+                swap={str(r): {str(c): swapped[r][c] for c in swapped[r]} for r in swapped},
+                allplay=dict(weeks=[fw[0], fw[-1]] if fw else None, n=len(fw), rec={str(r): played_all[r] for r in played_all}),
+                bench={str(r): {k: round(v, 1) for k, v in benched[r].items()} for r in benched})
     with open(OUT, "w") as f:
         f.write("/* Static snapshot generated by tools/podcast.py. The rankings workflow rewrites it; the hourly update does not. */\n")
         f.write("window.PODCAST=window.PODCAST||{};\nwindow.PODCAST[%s]=" % json.dumps(KEY) + json.dumps(data, separators=(",", ":"), ensure_ascii=False) + ";\n")

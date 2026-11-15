@@ -41,6 +41,15 @@ if (!def.includes("no forecast") || !def.includes("(dome)")) fail("defense weath
 if (!waiver.includes("\u2014")) fail("waiver dash missing");
 if (!starters.includes("Riley Sample") || !starters.includes("class=\"wx\"")) fail("starter weather cell missing");
 if (kick.includes("odds") || starters.includes("playoff")) fail("weekly table picked up an odds chart");
+if (!kick.includes(">Playoff SOS<") || !starters.includes(">Playoff SOS<") || !def.includes(">Playoff SOS<") || !flex.includes(">Playoff SOS<")) fail("playoff SOS column missing");
+if (!starters.includes("1.25") || !def.includes("1.10") || !kick.includes("0.90")) fail("playoff SOS value missing");
+if (!kick.includes(">\u2014<")) fail("missing playoff SOS should be a dash");
+if (has("best-t-keep").includes(">Playoff SOS<")) fail("keeper table picked up playoff SOS");
+const trade = has("best-t-trade"), faab = has("best-t-faab");
+if (!trade.includes("Drew Sample") || !trade.includes("RB22") || !trade.includes("Reese Sample")) fail("trade targets missing");
+if (trade.includes("Odds through") || trade.includes("repodds")) fail("trade section picked up an odds chart");
+if (!faab.includes("FAAB left") || !faab.includes(">29<") || !faab.includes("(you)")) fail("waiver budget missing");
+if (faab.includes("Odds through")) fail("waiver section picked up an odds chart");
 const lineup = ids["best-lineup"];
 if (!lineup || lineup.textContent.indexOf("Lineup optimal") < 0 || lineup.className.indexOf("success") < 0) fail("lineup banner missing");
 if (!/pill success">K1</.test(kick)) fail("kicker FP rank not colored");
@@ -66,4 +75,4 @@ if (foot.indexOf("Jaxon Sample") < 0 || foot.indexOf("North Sample") < 0) fail("
 if (foot.indexOf("Morgan Sample") < 0 || foot.indexOf("round 1") < 0 || foot.indexOf("Parker Sample") < 0 || foot.indexOf("round 2") < 0) fail("early-round footnote missing");
 if (ids["best-keep-title"].textContent.indexOf("2027") < 0) fail("keeper title missing season");
 if (keep.includes("odds")) fail("keeper table picked up an odds chart");
-console.log("render ok: 10 kickers, weather column, lineup banner, keeper table");
+console.log("render ok: 10 kickers, weather column, lineup banner, keeper table, playoff SOS, trades, waivers");

@@ -1,8 +1,8 @@
 /* Shared report renderer. Each league file sets window.REPORTS[key] = {STARTERS, BENCH, WAIVER, DEFENSE, KICKERS, KEEPERS}; call initReport(key). KEEPERS is Best League and Oopsilons only. */
 (function(){
-var COLS=["Slot","Player","Pos","Opponent","Prop-implied pts","Sleeper proj","FP rank","Status","Rush yds line","Rec yds line","Rec line","Anytime TD (DK)","Weather"];
-var DCOLS=["Slot","Player","Pos","Opponent","Prop-implied pts","Sleeper proj","FP rank","Status","Opp implied total","Game total (O/U)","Spread","Weather"];
-var KCOLS=["Slot","Player","Pos","Opponent","Prop-implied pts","Sleeper proj","FP rank","Status","FG made","Kicking pts","Weather"];
+var COLS=["Slot","Player","Pos","Opponent","Prop-implied pts","Sleeper proj","FP rank","Status","Rush yds line","Rec yds line","Rec line","Anytime TD (DK)","Weather","Playoff SOS"];
+var DCOLS=["Slot","Player","Pos","Opponent","Prop-implied pts","Sleeper proj","FP rank","Status","Opp implied total","Game total (O/U)","Spread","Weather","Playoff SOS"];
+var KCOLS=["Slot","Player","Pos","Opponent","Prop-implied pts","Sleeper proj","FP rank","Status","FG made","Kicking pts","Weather","Playoff SOS"];
 var SLOT={BN:"Bench",WAIVER:"FA"};
 function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function pill(t,c){return '<span class="pill '+c+'">'+esc(t)+'</span>'}
@@ -14,24 +14,26 @@ function tiers(items){return tiersBy(items,ppVal,false)}
 function statusCell(s){if(s==="Healthy")return pill(s,"success");if(s==="Questionable"||s==="Bye"||s==="Doubtful")return pill(s,"warning");if(s==="IR"||s==="Out"||s==="Suspended"||s==="PUP")return pill(s,"danger");if(s==="Played")return pill(s,"accent");return pill(s,"neutral")}
 function projCell(p){if(p.pp===null)return esc(p.proj)+" (\u2014)";var d=Math.round((parseFloat(p.pp.toFixed(1))-p.pn)*10)/10;var x=d>0?"+"+d.toFixed(1):d<0?"-"+Math.abs(d).toFixed(1):"0.0";return esc(p.proj)+" ("+x+")"}
 function wxCell(p){return esc(p.wx||"\u2014")}
+function sosVal(p){return typeof p.sos==="number"&&isFinite(p.sos)?p.sos:null}
+function sosCell(p,m){var v=sosVal(p);if(v===null)return "\u2014";var t=m&&m[p.name];var s=v.toFixed(2);return t?pill(s,t):esc(s)}
 function tr(cells,cols){var w=cols.indexOf("Weather");return "<tr>"+cells.map(function(c,i){return "<td"+(i===w?' class="wx"':"")+">"+c+"</td>"}).join("")+"</tr>"}
-function table(items){var tm=tiers(items),fm=tiersBy(items,fpVal,true);var h="<table><thead><tr>"+COLS.map(function(c){return"<th>"+esc(c)+"</th>"}).join("")+"</tr></thead><tbody>";
+function table(items){var tm=tiers(items),fm=tiersBy(items,fpVal,true),sm=tiersBy(items,sosVal,false);var h="<table><thead><tr>"+COLS.map(function(c){return"<th>"+esc(c)+"</th>"}).join("")+"</tr></thead><tbody>";
 items.forEach(function(it){var p=it.p,t=tm[p.name];var pp=(p.pp===null||!t)?"\u2014":pill(p.pp.toFixed(1),t);var td=p.atd==="\u2014"?"\u2014":p.atdr?p.atd+" ("+p.atdr+")":p.atd;
-var cells=[esc(it.label),esc(p.name+" \u00b7 "+p.team),esc(p.pos),esc(p.opp),pp,projCell(p),(fm[p.name]?pill(p.fp,fm[p.name]):esc(p.fp||"\u2014")),statusCell(p.status),esc(p.rush),esc(p.rec),esc(p.recs),esc(td),wxCell(p)];
+var cells=[esc(it.label),esc(p.name+" \u00b7 "+p.team),esc(p.pos),esc(p.opp),pp,projCell(p),(fm[p.name]?pill(p.fp,fm[p.name]):esc(p.fp||"\u2014")),statusCell(p.status),esc(p.rush),esc(p.rec),esc(p.recs),esc(td),wxCell(p),sosCell(p,sm)];
 h+=tr(cells,COLS)});
 return h+"</tbody></table>"}
 function dfpVal(p){var m=/^DEF(\d+)$/.exec(String(p.fp));return m?parseInt(m[1],10):null}
 function num1(v){return v==null?"\u2014":(Math.round(v*10)/10).toFixed(1)}
 function spreadTxt(v){return v==null?"\u2014":v===0?"PK":(v>0?"+":"")+v}
-function dtable(items){var tm=tiersBy(items,ppVal,false),fm=tiersBy(items,dfpVal,true);var h="<table><thead><tr>"+DCOLS.map(function(c){return"<th>"+esc(c)+"</th>"}).join("")+"</tr></thead><tbody>";
+function dtable(items){var tm=tiersBy(items,ppVal,false),fm=tiersBy(items,dfpVal,true),sm=tiersBy(items,sosVal,false);var h="<table><thead><tr>"+DCOLS.map(function(c){return"<th>"+esc(c)+"</th>"}).join("")+"</tr></thead><tbody>";
 items.forEach(function(it){var p=it.p,t=tm[p.name];var pp=(p.pp==null||!t)?"\u2014":pill(p.pp.toFixed(1),t);
-var cells=[esc(it.label),esc(p.name+" \u00b7 "+p.team),esc(p.pos),esc(p.opp),pp,projCell(p),(fm[p.name]?pill(p.fp,fm[p.name]):esc(p.fp||"\u2014")),statusCell(p.status),num1(p.opptot),num1(p.total),spreadTxt(p.spread),wxCell(p)];
+var cells=[esc(it.label),esc(p.name+" \u00b7 "+p.team),esc(p.pos),esc(p.opp),pp,projCell(p),(fm[p.name]?pill(p.fp,fm[p.name]):esc(p.fp||"\u2014")),statusCell(p.status),num1(p.opptot),num1(p.total),spreadTxt(p.spread),wxCell(p),sosCell(p,sm)];
 h+=tr(cells,DCOLS)});
 return h+"</tbody></table>"}
 function kfpVal(p){var m=/^K(\d+)$/.exec(String(p.fp||""));return m?parseInt(m[1],10):null}
-function ktable(items){var tm=tiersBy(items,ppVal,false),fm=tiersBy(items,kfpVal,true);var h="<table><thead><tr>"+KCOLS.map(function(c){return"<th>"+esc(c)+"</th>"}).join("")+"</tr></thead><tbody>";
+function ktable(items){var tm=tiersBy(items,ppVal,false),fm=tiersBy(items,kfpVal,true),sm=tiersBy(items,sosVal,false);var h="<table><thead><tr>"+KCOLS.map(function(c){return"<th>"+esc(c)+"</th>"}).join("")+"</tr></thead><tbody>";
 items.forEach(function(it){var p=it.p,t=tm[p.name];var pp=(p.pp==null||!t)?"\u2014":pill(p.pp.toFixed(1),t);
-var cells=[esc(it.label),esc(p.name+" \u00b7 "+p.team),esc(p.pos),esc(p.opp),pp,projCell(p),(fm[p.name]?pill(p.fp,fm[p.name]):esc(p.fp||"\u2014")),statusCell(p.status),esc(p.fg||"\u2014"),esc(p.kp||"\u2014"),wxCell(p)];
+var cells=[esc(it.label),esc(p.name+" \u00b7 "+p.team),esc(p.pos),esc(p.opp),pp,projCell(p),(fm[p.name]?pill(p.fp,fm[p.name]):esc(p.fp||"\u2014")),statusCell(p.status),esc(p.fg||"\u2014"),esc(p.kp||"\u2014"),wxCell(p),sosCell(p,sm)];
 h+=tr(cells,KCOLS)});
 return h+"</tbody></table>"}
 function kickItems(rows){var L={K:"Starter",BN:"Bench",WAIVER:"FA"};return (rows||[]).map(function(p){return{p:p,label:L[p.slot]||p.slot}})}
@@ -47,6 +49,24 @@ var val=p.value==null?"\u2014":pill(signed1(p.value),band);
 var cells=[esc(p.rk),who,esc(p.pos||"\u2014"),esc(p.owner||"\u2014"),esc(p.cost==null?"\u2014":p.cost),esc(p.how||"\u2014"),yearsText(p),rosText(p),ptsText(p),val];
 h+="<tr>"+cells.map(function(c){return "<td>"+c+"</td>"}).join("")+"</tr>"});
 return h+"</tbody></table>"}
+function tradeHtml(M){var T=M&&M.trades;if(!T)return '<p class="cap">Trade targets are not in this snapshot.</p>';
+if(!T.positions||!T.positions.length)return '<p class="cap">'+esc(T.note||"No thin position.")+'</p>';
+var h='<p class="cap">'+esc(T.team||"Your team")+' is short where another team has a spare. Starter-quality is a '+esc(T.source||"rank")+' at or better than one player per starting slot across the league. Candidates are the extra players, not the ones that team needs to start.</p>';
+T.positions.forEach(function(p){h+='<h3>'+esc(p.pos)+': '+p.have+' of '+p.need+'</h3>';
+if(p.yours&&p.yours.length)h+='<p class="cap">Yours: '+p.yours.map(function(y){return esc(y.name)+(y.rank!=null?" "+esc(p.pos)+y.rank:"")+(y.startable?"":" (not starter-quality)")}).join(", ")+'</p>';
+if(!p.teams||!p.teams.length){h+='<p class="cap">No other team has a spare starter-quality '+esc(p.pos)+'.</p>';return}
+h+='<div class="scroll"><table><thead><tr><th>Team</th><th>Starter-quality</th><th>Candidates</th></tr></thead><tbody>';
+p.teams.forEach(function(t){var c=(t.candidates||[]).map(function(x){return esc(x.name)+" ("+esc(p.pos)+x.rank+(x.nfl?", "+esc(x.nfl):"")+")"}).join(", ");
+h+='<tr><td>'+esc(t.name)+'</td><td>'+t.have+'</td><td>'+(c||"\u2014")+'</td></tr>'});
+h+='</tbody></table></div>'});
+return h}
+function faabHtml(M){var W=M&&M.waivers;if(!W||!W.rows)return '<p class="cap">Waiver standings are not in this snapshot.</p>';
+if(W.mode==="faab"){var h='<p class="cap">FAAB left is the league budget ('+esc(W.budget)+') minus the budget already used. This is the number Sleeper reports.</p><div class="scroll"><table><thead><tr><th>Team</th><th>Manager</th><th>Used</th><th>Left</th></tr></thead><tbody>';
+W.rows.forEach(function(r){h+='<tr'+(r.you?' class="you"':'')+'><td>'+esc(r.name)+(r.you?' (you)':'')+'</td><td>'+esc(r.user||"")+'</td><td>'+esc(r.used==null?"\u2014":r.used)+'</td><td>'+esc(r.remaining==null?"\u2014":r.remaining)+'</td></tr>'});
+return h+'</tbody></table></div>'}
+var h='<p class="cap">Waiver priority. 1 is the first claim. This league does not use FAAB.</p><div class="scroll"><table><thead><tr><th>Priority</th><th>Team</th><th>Manager</th></tr></thead><tbody>';
+W.rows.forEach(function(r){h+='<tr'+(r.you?' class="you"':'')+'><td>'+esc(r.priority==null?"\u2014":r.priority)+'</td><td>'+esc(r.name)+(r.you?' (you)':'')+'</td><td>'+esc(r.user||"")+'</td></tr>'});
+return h+'</tbody></table></div>'}
 function defItems(rows){var L={DEF:"Starter",BN:"Bench",WAIVER:"FA"};var mine=rows.filter(function(p){return p.slot!=="WAIVER"}).sort(byPP),fa=rows.filter(function(p){return p.slot==="WAIVER"}).sort(byPP);
 return mine.concat(fa).map(function(p){return{p:p,label:L[p.slot]||p.slot}})}
 window.initReport=function(key){
@@ -89,6 +109,8 @@ $("t-waiver").innerHTML=table(WAIVER.slice().sort(byPP).map(function(p){return{p
 var dt=$("t-def");if(dt)dt.innerHTML=dtable(defItems(d.DEFENSE||[]));
 var kt=$("t-kick");if(kt)kt.innerHTML=ktable(kickItems(d.KICKERS||[]));
 var pk=$("t-keep");if(pk){var kr=d.KEEPERS||[];pk.innerHTML=kr.length?keepTable(kr):'<p class="cap">No keeper values this week.</p>'}
+var tr=$("t-trade");if(tr)tr.innerHTML=tradeHtml(d.META);
+var fb=$("t-faab");if(fb)fb.innerHTML=faabHtml(d.META);
 render()}
 window.REDRAW=window.REDRAW||{};window.REDRAW[key]=draw;
 draw();

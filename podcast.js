@@ -103,8 +103,46 @@ h.push('<section><h2>Methodology</h2><ul class="meth">'+
 '<li><b>Bye Week Merchant:</b> points your opponents lost because their players were on bye the week they played you (their best lineup with vs without bye players, using season averages), summed over the season. \u201c(1 win)\u201d = you won by less than that.</li>'+
 '<li><b>Who pays:</b> the team holding the player that week (last holder if he was dropped). Pick value comes from the original draft pick.</li>'+
 '<li><b>Caveat:</b> Sleeper has no injury history, so causes of past misses aren\u2019t confirmed, and return dates are estimates. Data: Sleeper, plus news reports for timelines.</li></ul></section>');
+h.push(swapSection(D,T));
+h.push(allPlaySection(D,T));
+h.push(benchSection(D,T));
 return h.join("");
 }
+function cellRec(a){return a?rec(a[0],a[1],a[2]):"\u2014"}
+function shortTeam(nm){var s=String(nm);return s.length>12?s.slice(0,11)+"\u2026":s}
+function swapSection(D,T){var S=D.swap;if(!S||!T.length)return "";
+var ids=T.map(function(t){return String(t.rid)});
+if(!S[ids[0]])return "";
+var h='<section><h2>Schedule swap</h2><p class="cap">Each row is the record that team would have on the column team\u2019s schedule, using its own scores against that opponent\u2019s score. A week the column team played the row team is left out. The shaded cell is the team\u2019s own schedule. Only weeks whose games are all final.</p>';
+h+='<div class="scroll"><table class="grid"><thead><tr><th>Team</th>';
+T.forEach(function(t){h+='<th title="'+esc(t.name)+'">'+esc(shortTeam(t.name))+'</th>'});
+h+='</tr></thead><tbody>';
+T.forEach(function(t){var row=S[String(t.rid)]||{};
+h+='<tr><td class="nm">'+esc(t.name)+' ('+rec(t.w,t.l,t.t)+')</td>';
+ids.forEach(function(c){h+='<td'+(c===String(t.rid)?' class="own"':'')+'>'+cellRec(row[c])+'</td>'});
+h+='</tr>'});
+return h+'</tbody></table></div></section>'}
+function allPlaySection(D,T){var A=D.allplay;if(!A||!A.n||!A.rec)return "";
+function wp(a){var g=a[0]+a[1]+a[2];return g?(a[0]+0.5*a[2])/g:0}
+var rows=T.map(function(t){return {t:t,a:A.rec[String(t.rid)]}}).filter(function(x){return x.a});
+if(!rows.length)return "";
+rows.sort(function(a,b){return wp(b.a)-wp(a.a)||b.t.pf-a.t.pf});
+var span=A.weeks&&A.weeks[0]!=null?(A.weeks[0]===A.weeks[1]?"Week "+A.weeks[0]:"Weeks "+A.weeks[0]+"\u2013"+A.weeks[1]):"";
+var hole=A.weeks&&(A.weeks[1]-A.weeks[0]+1)!==A.n;
+var when=hole?A.n+" final weeks":span;
+var h='<section><h2>All-play record</h2><p class="cap">The record if the team had played every other team every week'+(when?", "+when:"")+'. Only weeks whose games are all final. Wins, then win percentage.</p>';
+h+='<div class="scroll"><table><thead><tr><th>Rank</th><th>Team</th><th>All-play</th><th>Win %</th><th>Games</th></tr></thead><tbody>';
+rows.forEach(function(x,i){var g=x.a[0]+x.a[1]+x.a[2];
+h+='<tr><td>'+(i+1)+'</td><td>'+esc(x.t.name)+' ('+rec(x.t.w,x.t.l,x.t.t)+')</td><td>'+cellRec(x.a)+'</td><td>'+(g?(100*wp(x.a)).toFixed(1)+"%":"\u2014")+'</td><td>'+g+'</td></tr>'});
+return h+'</tbody></table></div></section>'}
+function benchSection(D,T){var B=D.bench;if(!B)return "";
+var rows=T.map(function(t){var b=B[String(t.rid)];return b?{t:t,b:b}:null}).filter(Boolean);
+if(!rows.length)return "";
+rows.sort(function(a,b){return b.b.gap-a.b.gap||b.b.left-a.b.left});
+var h='<section><h2>Bench points</h2><p class="cap">Bench points are what players who did not start scored. The gap is the best legal lineup, using the league\u2019s slots, minus the points the lineup actually scored. Only weeks whose games are all final.</p>';
+h+='<div class="scroll"><table><thead><tr><th>Team</th><th>Bench points</th><th>Optimal</th><th>Actual</th><th>Gap</th></tr></thead><tbody>';
+rows.forEach(function(x){h+='<tr><td>'+esc(x.t.name)+' ('+rec(x.t.w,x.t.l,x.t.t)+')</td><td>'+f1(x.b.left)+'</td><td>'+f1(x.b.opt)+'</td><td>'+f1(x.b.actual)+'</td><td>'+f1(x.b.gap)+'</td></tr>'});
+return h+'</tbody></table></div></section>'}
 
 window.buildPodcast=build;
 /* Sub-tabs of one league: Power Rankings (default), Luck report, Weekly report (password-locked by lock.js).
