@@ -53,9 +53,12 @@ function textOf(id) {
   return (e.textContent || "") + " " + kids;
 }
 const keep = has("best-t-keep"), foot = textOf("best-keep-foot");
-if (!keep.includes(">Cost<") || !keep.includes(">How<") || !keep.includes(">ROS<") || !keep.includes(">2026 pts<") || !keep.includes(">Value<")) fail("keeper columns missing");
+if (!keep.includes(">Cost<") || !keep.includes(">How<") || !keep.includes(">Years left<") || !keep.includes(">ROS<") || !keep.includes(">2026 pts<") || !keep.includes(">Value<")) fail("keeper columns missing");
 if ((keep.match(/<tr>/g) || []).length !== 9) fail("keeper table should be 1 header + 8 rows");
 if (!keep.includes("Quinn Sample") || !keep.includes("Rd 15") || !keep.includes("Waiver") || !keep.includes("WR3 (8)")) fail("keeper row missing");
+if (!keep.includes(">Rd 15</td><td>2</td>")) fail("years left 2 missing");
+if (!keep.includes(">Waiver</td><td>1</td>")) fail("years left 1 missing");
+if (!keep.includes(">Rd 6</td><td>\u2014</td>")) fail("missing years left should be a dash");
 if (!keep.includes("\u2014")) fail("keeper dash missing");
 if (keep.includes("Jaxon Sample") || keep.includes("Morgan Sample") || keep.includes("Parker Sample") || keep.includes("(you)") || keep.includes(">You<") || keep.includes("Rd 1<") || keep.includes(">Rd 2<")) fail("keeper table leaked an ineligible name or a you label");
 if (!keep.includes(">Rd 3<")) fail("3rd-round keeper missing");

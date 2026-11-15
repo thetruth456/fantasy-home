@@ -638,6 +638,71 @@ class Keepers(unittest.TestCase):
         self.assertFalse(keepers.eligible(keepers.kept_seasons(both, "other"), 2027))
         self.assertTrue(keepers.eligible(keepers.kept_seasons(gap, "gap"), 2027))
         self.assertEqual(keepers.kept_seasons(one, "jsn"), {2026})
+        self.assertEqual(keepers.years_left(keepers.kept_seasons(one, "jsn"), 2027), 1)
+        self.assertEqual(keepers.years_left(keepers.kept_seasons(both, "other"), 2027), 0)
+        self.assertEqual(keepers.years_left(keepers.kept_seasons(gap, "gap"), 2027), 2)
+
+    def test_years_left_uses_only_the_last_two_keeper_seasons(self):
+        def drafts(*flags):
+            # flags: (season, is_keeper) for player "a"
+            return [{"season": season, "picks": [{"player_id": "a", "round": 8, "is_keeper": kept}]}
+                    for season, kept in flags]
+
+        def left(rows):
+            return keepers.years_left(keepers.kept_seasons(rows, "a"), 2027)
+
+        self.assertEqual(left([]), 2)
+        self.assertEqual(left(drafts(("2026", False), ("2025", False))), 2)
+        self.assertEqual(left(drafts(("2025", True))), 2)
+        self.assertEqual(left(drafts(("2024", True), ("2025", True), ("2026", False))), 2)
+        self.assertEqual(left(drafts(("2026", True))), 1)
+        self.assertEqual(left(drafts(("2026", True), ("2024", True))), 1)
+        self.assertEqual(left(drafts(("2026", True), ("2025", True))), 0)
+        self.assertEqual(left(drafts(("2026", True), ("2025", True), ("2024", True))), 0)
+        # Sleeper leaves is_keeper null on a normal pick. That is not a keeper year.
+        self.assertEqual(keepers.kept_seasons(
+            [{"season": "2026", "picks": [{"player_id": "a", "round": 4, "is_keeper": None}]}], "a"), set())
+        self.assertEqual(left([{"season": "2026", "picks": [{"player_id": "a", "round": 4, "is_keeper": None}]}]), 2)
+        self.assertIsNone(keepers.years_left({2025, 2026}, "season"))
+        self.assertTrue(keepers.eligible(set(), 2027))
+        self.assertFalse(keepers.eligible({2025, 2026}, 2027))
+
+    def test_ranked_rows_carry_one_or_two_years_left(self):
+        players = {
+            "fresh": {"full_name": "Fresh Keeper", "position": "WR", "team": "GB"},
+            "once": {"full_name": "Once Keeper", "position": "WR", "team": "KC"},
+            "reset": {"full_name": "Reset Keeper", "position": "RB", "team": "DET"},
+            "twice": {"full_name": "Twice Keeper", "position": "WR", "team": "SEA"},
+        }
+        proj = []
+        for pid, adp in (("fresh", 10), ("once", 12), ("reset", 20), ("twice", 8)):
+            proj.append({"player_id": pid, "team": players[pid]["team"],
+                         "player": {"position": players[pid]["position"], "full_name": players[pid]["full_name"]},
+                         "stats": {"adp_half_ppr": adp}})
+        users = [{"user_id": "u1", "metadata": {"team_name": "North Sample"}}]
+        rosters = [{"roster_id": 1, "owner_id": "u1", "players": list(players)}]
+        drafts = [
+            {"season": "2026", "rounds": 15, "picks": [
+                {"player_id": "fresh", "round": 10, "is_keeper": False},
+                {"player_id": "once", "round": 8, "is_keeper": True},
+                {"player_id": "reset", "round": 9, "is_keeper": False},
+                {"player_id": "twice", "round": 6, "is_keeper": True},
+            ]},
+            {"season": "2025", "rounds": 15, "picks": [
+                {"player_id": "once", "round": 10, "is_keeper": False},
+                {"player_id": "reset", "round": 11, "is_keeper": True},
+                {"player_id": "twice", "round": 8, "is_keeper": True},
+            ]},
+        ]
+        pack = keepers.build(_bundle([], users, rosters), {"proj": proj, "stats": [], "ros": {}}, players, drafts=drafts)
+        by = {r["name"]: r for r in pack["rows"]}
+        self.assertEqual(by["Fresh Keeper"]["years_left"], 2)
+        self.assertEqual(by["Once Keeper"]["years_left"], 1)
+        self.assertEqual(by["Reset Keeper"]["years_left"], 2)
+        self.assertNotIn("Twice Keeper", by)
+        self.assertIn("Twice Keeper", {p["name"] for p in pack["meta"]["ineligible"]})
+        self.assertTrue(all(r["years_left"] in (1, 2) for r in pack["rows"]))
+        self.assertTrue(all("years_left" not in p for p in pack["meta"]["ineligible"]))
 
     def test_this_years_round_includes_a_keeper_slot(self):
         drafts = [
@@ -726,6 +791,10 @@ class Keepers(unittest.TestCase):
         self.assertEqual(by["Waiver Add"]["how"], "Waiver")
         self.assertEqual(by["Player 008"]["cost"], 6)
         self.assertEqual(by["Player 008"]["how"], "Rd 8")
+        self.assertEqual(by["Player 008"]["years_left"], 1)
+        self.assertEqual(by["Player 010"]["years_left"], 2)
+        self.assertEqual(by["Waiver Add"]["years_left"], 2)
+        self.assertTrue(all(r["years_left"] in (1, 2) for r in rows))
         self.assertNotIn("Jaxon Smith-Njigba", by)
         self.assertNotIn("Casey Keeper", by)
         inn = {p["name"]: p for p in pack["meta"]["ineligible"]}
@@ -746,8 +815,15 @@ class Keepers(unittest.TestCase):
         self.assertIsNone(keepers.extra_note("zbt"))
         self.assertIsNone(keepers.extra_note("spacex"))
         self.assertIn("previous two seasons", keepers.extra_note("best"))
+        self.assertIn("Years left is 2", keepers.extra_note("best"))
         self.assertIn("3rd-round", keepers.extra_note("best"))
         self.assertIn("Defenses are not keepers", keepers.extra_note("best"))
+        self.assertIn("Years left", (ROOT / "report-core.js").read_text())
+        self.assertIn("Years left is 2", (ROOT / "best-league.html").read_text())
+        self.assertIn("Years left is 2", (ROOT / "oopsilons.html").read_text())
+        self.assertEqual((ROOT / "index.html").read_text().count("Years left is 2"), 2)
+        self.assertNotIn("Years left", (ROOT / "zbt.html").read_text())
+        self.assertNotIn("Years left", (ROOT / "spacex-ff.html").read_text())
         self.assertEqual(keepers.ros_page({"rec": 0.5}), "ros-half-point-ppr-overall")
         self.assertEqual(keepers.ros_page({"rec": 1}), "ros-ppr-overall")
         self.assertIsNone(keepers.ros_page({"rec": 0}))
@@ -876,7 +952,7 @@ def write_fixture_page(dest):
 <section id="best-keepers"><h2 id="best-keep-title">Top keepers</h2>
 <ul class="cap method">
 <li>Cost is this year's draft round minus 2, including the round a player was already kept in. A 3rd-round pick is a 1st-round keeper, and that is the earliest keep. A player drafted in the 1st or 2nd round cannot be kept. The latest cost is a 9th. A player who was not in this year's draft (waiver or free agency) costs a 9th. A trade does not change the round; the table shows whoever holds him now.</li>
-<li>A player kept in both of the previous two seasons is ineligible and is left off the ranking. A 1st- or 2nd-round pick is ineligible too, and is not given a 1st-round cost. Both lists, when the drafts have them, are under the table.</li>
+<li>Years left is 2 when he was not a keeper in this year's draft, and 1 when he was kept this year but not the year before. A player kept in both of the previous two seasons has 0 years left, is ineligible, and is left off the ranking. A 1st- or 2nd-round pick is ineligible too, and is not given a 1st-round cost. Both lists, when the drafts have them, are under the table.</li>
 <li>Value is how many picks earlier he would be drafted today than the middle of his keep round. Today's slot is his FantasyPros rest-of-season rank (half-PPR here). If that rank is missing, it is his Sleeper ADP. A rank already around the keep round is about zero: he could just be drafted there. Defenses are not keepers. A dash means the draft slot was missing.</li>
 </ul>
 <div class="scroll" id="best-t-keep"></div>

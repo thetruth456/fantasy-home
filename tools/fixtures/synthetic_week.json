@@ -48,13 +48,13 @@
         {"slot": "WAIVER", "name": "Jules Sample", "pos": "K", "team": "PHI", "opp": "vs NYG (Sun)", "status": "Healthy", "proj": "6.4", "pn": 6.4, "pp": null, "fp": "K14", "wx": "no obs"}
       ],
       "KEEPERS": [
-        {"rk": 1, "name": "Quinn Sample", "pos": "WR", "nfl": "GB", "owner": "North Sample", "cost": 9, "how": "Rd 15", "ros": 8, "prosr": "WR3", "pts": 142.4, "prank": "WR6", "value": 6.4},
-        {"rk": 2, "name": "Reese Sample", "pos": "RB", "nfl": "DET", "owner": "East Sample", "cost": 9, "how": "Waiver", "ros": 18, "prosr": "RB8", "pts": 128.0, "prank": "RB9", "value": 5.1},
-        {"rk": 3, "name": "Avery Sample", "pos": "WR", "nfl": "MIN", "owner": "South Sample", "cost": 6, "how": "Rd 8", "ros": 24, "prosr": "WR11", "pts": 119.5, "prank": "WR12", "value": 3.4},
-        {"rk": 4, "name": "Blake Sample", "pos": "QB", "nfl": "KC", "owner": "West Sample", "cost": 1, "how": "Rd 3", "ros": 4, "prosr": "QB2", "pts": 210.0, "prank": "QB2", "value": 1.2},
-        {"rk": 5, "name": "Casey Sample", "pos": "TE", "nfl": "SF", "owner": "North Sample", "cost": 3, "how": "Rd 5", "ros": null, "prosr": null, "pts": 96.2, "prank": "TE4", "value": 0.8},
-        {"rk": 6, "name": "Drew Sample", "pos": "RB", "nfl": "PHI", "owner": "East Sample", "cost": 2, "how": "Rd 4", "ros": 2, "prosr": "RB2", "pts": null, "prank": null, "value": 0.4},
-        {"rk": 7, "name": "Eden Sample", "pos": "WR", "nfl": "DAL", "owner": "South Sample", "cost": 9, "how": "Rd 11", "ros": 70, "prosr": "WR30", "pts": 61.0, "prank": "WR41", "value": -0.6},
+        {"rk": 1, "name": "Quinn Sample", "pos": "WR", "nfl": "GB", "owner": "North Sample", "cost": 9, "how": "Rd 15", "years_left": 2, "ros": 8, "prosr": "WR3", "pts": 142.4, "prank": "WR6", "value": 6.4},
+        {"rk": 2, "name": "Reese Sample", "pos": "RB", "nfl": "DET", "owner": "East Sample", "cost": 9, "how": "Waiver", "years_left": 1, "ros": 18, "prosr": "RB8", "pts": 128.0, "prank": "RB9", "value": 5.1},
+        {"rk": 3, "name": "Avery Sample", "pos": "WR", "nfl": "MIN", "owner": "South Sample", "cost": 6, "how": "Rd 8", "years_left": 2, "ros": 24, "prosr": "WR11", "pts": 119.5, "prank": "WR12", "value": 3.4},
+        {"rk": 4, "name": "Blake Sample", "pos": "QB", "nfl": "KC", "owner": "West Sample", "cost": 1, "how": "Rd 3", "years_left": 1, "ros": 4, "prosr": "QB2", "pts": 210.0, "prank": "QB2", "value": 1.2},
+        {"rk": 5, "name": "Casey Sample", "pos": "TE", "nfl": "SF", "owner": "North Sample", "cost": 3, "how": "Rd 5", "years_left": 2, "ros": null, "prosr": null, "pts": 96.2, "prank": "TE4", "value": 0.8},
+        {"rk": 6, "name": "Drew Sample", "pos": "RB", "nfl": "PHI", "owner": "East Sample", "cost": 2, "how": "Rd 4", "years_left": 1, "ros": 2, "prosr": "RB2", "pts": null, "prank": null, "value": 0.4},
+        {"rk": 7, "name": "Eden Sample", "pos": "WR", "nfl": "DAL", "owner": "South Sample", "cost": 9, "how": "Rd 11", "years_left": 2, "ros": 70, "prosr": "WR30", "pts": 61.0, "prank": "WR41", "value": -0.6},
         {"rk": 8, "name": "Finley Sample", "pos": "QB", "nfl": "BUF", "owner": "West Sample", "cost": 4, "how": "Rd 6", "ros": null, "prosr": null, "pts": null, "prank": null, "value": -1.5}
       ]
     }
