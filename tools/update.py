@@ -83,6 +83,27 @@ def iso(t):
     return t.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def final_week_stats(season, week, sched, current_stats):
+    """Stat lines for weeks whose games are all final. The in-progress week is left out."""
+    weeks = [w for w in range(1, int(week)) if build.schedule_complete(sched, w)]
+    try:
+        if S.week_final(season, week):
+            weeks.append(int(week))
+    except Exception as e:  # noqa: BLE001
+        log("WARNING: could not check whether week %s is final (%s)" % (week, e))
+    out = {}
+    for w in weeks:
+        if w == int(week):
+            out[w] = current_stats
+            continue
+        try:
+            out[w] = S.sleeper_stats(season, w, "regular")
+        except Exception as e:  # noqa: BLE001
+            log("WARNING: stats for week %s unavailable (%s); playoff SOS leaves that week out" % (w, e))
+    log("playoff SOS baseline: %d final weeks" % len(out))
+    return out
+
+
 # ------------------------------------------------------------------ main
 def main():
     force = os.environ.get("FORCE", "").strip().lower() in ("1", "true", "yes")
@@ -129,6 +150,11 @@ def main():
     ctx = dict(week=week, players=players, proj={x["player_id"]: x for x in projs if x.get("player_id")},
                stats={x["player_id"]: x["stats"] for x in stats if x.get("player_id") and x.get("stats")}, games=games)
     log("projections %d, stats %d, games this week %d" % (len(ctx["proj"]), len(ctx["stats"]), len(games) // 2))
+    try:
+        week_stats = final_week_stats(season, week, sched, stats)
+    except Exception as e:  # noqa: BLE001
+        log("WARNING: playoff SOS baseline failed (%s); that column stays a dash" % e)
+        week_stats = {}
 
     # --- props (Fieldwork)
     overrides = None
@@ -266,6 +292,45 @@ def main():
             log("        keepers: %d ranked, %d ineligible" % (
                 len(d.get("KEEPERS") or []), len((keeper_meta or {}).get("ineligible") or [])))
         m = d.pop("meta")
+        scoring = m["scoring"]
+
+        def score_fn(st, pos, scoring=scoring):
+            return build.score_stats(scoring, st, pos)
+
+        def pos_of(pid):
+            return (players.get(str(pid)) or {}).get("position") or ""
+
+        sos_note = "Playoff SOS was not available for this run, so that column is a dash."
+        try:
+            allowed, league_avg = build.points_allowed(sched, week_stats, pos_of, score_fn, list(week_stats))
+            build.apply_sos([d["STARTERS"], d["BENCH"], d["WAIVER"], d.get("DEFENSE") or [], d.get("KICKERS") or []],
+                            allowed, league_avg, sched)
+            sos_note = build.SOS_NOTE
+        except Exception as e:  # noqa: BLE001
+            log("WARNING: playoff SOS failed for %s (%s)" % (key, e))
+        try:
+            page = keepers.ros_page(scoring)
+            block = ((keeper_shared or {}).get("ros") or {}).get(page) if page and keeper_shared else None
+            ros = keepers.RosIndex((block or {}).get("players")) if block else None
+
+            def lookup(name, team, pos, ros=ros):
+                return ros.lookup(name, team, pos) if ros else None
+
+            proj_by = keepers._index_rows((keeper_shared or {}).get("proj")) if keeper_shared else {}
+            values, src = build.roster_values(bundle["rosters"], players, lookup, proj_by, score_fn)
+            trades = build.trade_targets(bundle["rosters"], bundle["users"], USER_ID, values,
+                                         bundle["league"].get("roster_positions") or [],
+                                         bundle["league"].get("total_rosters") or len(bundle["rosters"]), src)
+        except Exception as e:  # noqa: BLE001
+            log("WARNING: trade targets failed for %s (%s)" % (key, e))
+            trades = dict(team="", user="", source="", positions=[], note="Trade targets were not available for this run.")
+        try:
+            waivers = build.waiver_snapshot(bundle["league"], bundle["rosters"], bundle["users"], USER_ID)
+        except Exception as e:  # noqa: BLE001
+            log("WARNING: waiver standings failed for %s (%s)" % (key, e))
+            waivers = None
+        log("        trades: %d thin positions; waivers: %s" % (
+            len((trades or {}).get("positions") or []), (waivers or {}).get("mode") or "missing"))
         ros_asof = None
         if keepers.enabled(key):
             block = (keeper_shared or {}).get("ros", {}).get((keeper_meta or {}).get("ros_page")) if keeper_shared else None
@@ -281,6 +346,8 @@ def main():
         notes = build.notes_for(d["STARTERS"] + d["BENCH"] + d["WAIVER"] + d.get("KICKERS", []) + d.get("DEFENSE", []), overrides, week)
         if keepers.extra_note(key):
             notes = list(notes) + [keepers.extra_note(key)]
+        if sos_note:
+            notes = list(notes) + [sos_note]
         META = dict(
             key=key, week=week, season=season, season_type=stype, league_id=m["league_id"], name=m["name"],
             title="%s Week %d: roster, kickers, waiver flex options and prop tiebreakers" % (m["name"], week),
@@ -293,6 +360,9 @@ def main():
             asof=build.asof_text(sources), generated=iso(now if os.environ.get("FH_NOW") else dt.datetime.now(dt.timezone.utc)))
         if keeper_meta is not None:
             META["keepers"] = keeper_meta
+        META["trades"] = trades
+        if waivers is not None:
+            META["waivers"] = waivers
         d["META"] = META
         if canon(d) == canon(prev) and not force:
             log("%-7s no substantive change; leaving file as is" % key)

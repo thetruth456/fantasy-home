@@ -236,7 +236,10 @@ def history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT
             lw = sum(mu[w].values()) / len(rids)
             for r in rids:
                 mu[w][r] = lw + b * (mu[w][r] - lw)
-        out.append(dict(week=t, **sim_odds(mu, rec, rids, pairs, nplay, math.sqrt(sd ** 2 - k * k * vw), tau_k(t, sd), sims, 1000 + t, PT, k, nbye)))
+        piece = dict(week=t, **sim_odds(mu, rec, rids, pairs, nplay, math.sqrt(sd ** 2 - k * k * vw), tau_k(t, sd), sims, 1000 + t, PT, k, nbye))
+        if weeks:  # forward strength after this week: mean remaining regular-season points, same mu the odds used
+            piece["st"] = {r: round(sum(mu[w][r] for w in weeks) / len(weeks), 1) for r in rids}
+        out.append(piece)
         S.log("history after week %d done" % t)
     return out
 
@@ -264,6 +267,68 @@ def sim_odds(mu, rec, rids, pairs, nplay, sd, tk, sims, seed, inj=None, k=1.0, n
             po[r] += 1
             if i < nbye: bye[r] += 1
     return dict(po={r: round(po[r] / sims * 100, 1) for r in rids}, bye={r: round(bye[r] / sims * 100, 1) for r in rids})
+
+
+def stake_odds(draws, rec, rids, pairs, nplay, cur):
+    """Playoff rate if each team is assigned the win, and the loss, in week `cur`.
+
+    draws is the list of {week: {roster: points}} already drawn by the simulation.
+    Each team keeps the points it scored in that draw. Only the win or the loss is
+    assigned, so a team can "win" a game it scored fewer points in. Every other
+    game stays as drawn. Returns {roster: {opp, win, loss}} in percent, or None
+    when this week was not part of the simulation (the regular season is over).
+    """
+    if not draws or cur not in draws[0]:
+        return None
+    weeks = sorted(w for w in draws[0] if w in pairs)
+    matchups = list(pairs.get(cur) or [])
+    if not matchups:
+        return None
+    opp = {}
+    for a, b in matchups:
+        opp[a], opp[b] = b, a
+    n = len(draws)
+    hit = {r: [0, 0] for r in rids}  # times the forced win, and the forced loss, still made the playoffs
+    base_w = {r: rec[r]["w"] + 0.5 * rec[r]["t"] for r in rids}
+    base_f = {r: float(rec[r]["pf"]) for r in rids}
+    for draw in draws:
+        W = dict(base_w)
+        F = dict(base_f)
+        natural = {}
+        for w in weeks:
+            sc = draw[w]
+            for x, y in pairs[w]:
+                sx, sy = sc[x], sc[y]
+                F[x] += sx
+                F[y] += sy
+                if sx > sy:
+                    W[x] += 1
+                    got = x
+                elif sy > sx:
+                    W[y] += 1
+                    got = y
+                else:
+                    W[x] += 0.5
+                    W[y] += 0.5
+                    got = None
+                if w == cur:
+                    natural[(x, y)] = got
+        for (x, y), got in natural.items():
+            for winner in (x, y):
+                W2 = dict(W)
+                if got is None:
+                    W2[x] -= 0.5
+                    W2[y] -= 0.5
+                else:
+                    W2[got] -= 1
+                W2[winner] += 1
+                made = set(sorted(rids, key=lambda r: (-W2[r], -F[r]))[:nplay])
+                loser = y if winner == x else x
+                if winner in made:
+                    hit[winner][0] += 1
+                if loser in made:
+                    hit[loser][1] += 1
+    return {r: dict(opp=opp[r], win=round(hit[r][0] / n * 100, 1), loss=round(hit[r][1] / n * 100, 1)) for r in rids if r in opp}
 
 
 def bracket(league_id, order, nplay):
@@ -490,7 +555,7 @@ def main(lg, sims=10000):
     PR = {w: pairs(w) for w in range(cur, reg_end + 1)}
     TK = tau_k(last, sd)
 
-    def simulate(rng, pairfn, n, playoffs):
+    def simulate(rng, pairfn, n, playoffs, sink=None):
         irng = random.Random(rng.random())   # injury-path picks on their own stream
         seedc = {r: [0] * nplay for r in rids}
         finc = {r: [0] * len(rids) for r in rids}
@@ -500,13 +565,18 @@ def main(lg, sims=10000):
             F = {r: rec[r]["pf"] for r in rids}
             off = {r: rng.gauss(0, TK) if TK else 0.0 for r in rids}
             ip = {r: PT[r][irng.randrange(len(PT[r]))] for r in rids}
+            drawn = {}
             for w in range(cur, reg_end + 1):
                 sc = {r: rng.gauss(mu[w][r] + (off[r] + k * ip[r][w] if w > cur else frac[r] * off[r]), sd_e * (math.sqrt(frac[r]) if w == cur else 1)) for r in rids}
+                if sink is not None:
+                    drawn[w] = sc
                 for a, b in pairfn(w):
                     F[a] += sc[a]; F[b] += sc[b]
                     if sc[a] > sc[b]: W[a] += 1
                     elif sc[b] > sc[a]: W[b] += 1
                     else: W[a] += .5; W[b] += .5
+            if sink is not None:
+                sink.append(drawn)
             order = sorted(rids, key=lambda r: (-W[r], -F[r]))
             for i, r in enumerate(order):
                 finc[r][i] += 1; wins_sum[r] += W[r]
@@ -527,7 +597,8 @@ def main(lg, sims=10000):
                     final[a] += 1; final[b] += 1
                     title[won[x["m"]]] += 1
         return seedc, finc, title, final, wins_sum
-    seedc, finc, title, final, wins_sum = simulate(random.Random(20261031), lambda w: PR[w], sims, True)
+    stake_draws = []
+    seedc, finc, title, final, wins_sum = simulate(random.Random(20261031), lambda w: PR[w], sims, True, stake_draws)
 
     # same model on a neutral schedule (random opponents every remaining week) -> schedule effect
     nrng = random.Random(7)
@@ -582,7 +653,11 @@ def main(lg, sims=10000):
         x["inj_cost"], x["inj_sd"] = round(inj_cost[x["rid"]], 1), round(inj_sd[x["rid"]], 1)
     hist = [] if os.environ.get("FH_POWER_NO_HISTORY") else history(season, last, reg_end, nplay, slots, fpts, rids, M, pairs, sched, LT, P, sd, sims, (inj_dev, pre_dev, PT0, vw0), nbye)
     by_r = {x["rid"]: x for x in rows}
-    hist.append(dict(week=cur, live=True, po={r: by_r[r]["playoff"] for r in rids}, bye={r: by_r[r]["bye"] for r in rids}))
+    live_row = dict(week=cur, live=True, po={r: by_r[r]["playoff"] for r in rids}, bye={r: by_r[r]["bye"] for r in rids})
+    if fut:
+        live_row["st"] = {r: by_r[r]["strength"] for r in rids}
+    hist.append(live_row)
+    stake = stake_odds(stake_draws, rec, rids, PR, nplay, cur) if cur <= reg_end else None
     now = datetime.datetime.now(datetime.timezone.utc)
     def sdesc(x):
         return "seed %d" % x[1] if x[0] == "s" else "W%d" % x[1]
@@ -593,6 +668,7 @@ def main(lg, sims=10000):
                 hist=hist, recs=recs, season=season, asof=now.strftime("%Y-%m-%dT%H:%M:%SZ"), last=last, cur=cur, reg_end=reg_end, pstart=pstart, end=end,
                 sims=sims, sd=round(sd, 1), k=round(k, 3), g0=G0, w_now=round(blend_w(last), 2), tau0=TAU0, tau_now=round(TK, 1), tau_pre=round(tau_pre(), 1), beta0=BETA0, sd_noise=round(sd_e, 1), npath=NPATH, inj_hazard=INJ.HAZARD, beta_now=round(B, 2), draft_type=drafts[0].get("type"), pw=PW, nplay=nplay,
                 locked_games=sorted({tm for (w, tm) in done | live if w == cur}),
+                stake=({str(r): stake[r] for r in stake} if stake else None),
                 teams=rows)
     with open(OUT, "w") as f:
         f.write("/* Static snapshot generated by tools/power.py. The rankings workflow rewrites it; the hourly update does not. */\n")

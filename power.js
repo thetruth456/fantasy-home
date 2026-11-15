@@ -81,6 +81,33 @@ window.buildPowerOdds=function(D,opt){return D?oddsChart(D,opt):""};
 /* Ben's (podcast co-host) rankings, keyed by Sleeper roster_id: Best League only */
 var BEN={4:1,10:2,2:3,8:4,11:5,12:6,6:7,1:8,3:9,5:10,9:11,7:12};
 function rng(a,b){return a===b?String(a):a+"\u2013"+b}
+function stakeOf(D,t){var s=D.stake&&(D.stake[t.rid]!=null?D.stake[t.rid]:D.stake[String(t.rid)]);return s||null}
+function named(t){return esc(t.name)+" ("+rec(t.w,t.l,t.t)+")"}
+function stakeSection(D,T,by){if(!D.stake||D.cur>D.reg_end)return "";
+var rows=T.map(function(t){var s=stakeOf(D,t);return s?{t:t,s:s}:null}).filter(Boolean);if(!rows.length)return "";
+rows.sort(function(a,b){return (b.s.win-b.s.loss)-(a.s.win-a.s.loss)||b.t.playoff-a.t.playoff});
+function sg(v){var r=Math.round(v*10)/10;return (r>0?"+":r<0?"\u2212":"")+Math.abs(r).toFixed(1)}
+var h='<section><h2>What\u2019s at stake this week</h2><p class="cap">Playoff odds if this week\u2019s result is assigned as a win or a loss. Each team still scores its simulated points; only the win and the loss change. The rest of the draws are the same ones behind the chart. Week '+D.cur+'.</p>';
+h+='<div class="scroll"><table><thead><tr><th>Team</th><th>Opponent</th><th>If win</th><th>If loss</th><th>Swing</th></tr></thead><tbody>';
+rows.forEach(function(x){var opp=by[x.s.opp];
+h+='<tr><td>'+named(x.t)+'</td><td>'+(opp?named(opp):"\u2014")+'</td><td>'+pc(x.s.win)+'</td><td>'+pc(x.s.loss)+'</td><td>'+sg(x.s.win-x.s.loss)+'</td></tr>'});
+return h+"</tbody></table></div></section>"}
+function stAt(h,rid){if(!h.st)return null;var v=h.st[rid];return v==null?h.st[String(rid)]:v}
+function trendSection(D,T){var H=(D.hist||[]).filter(function(h){return h.st});if(H.length<2)return "";
+var vals=[];H.forEach(function(h){T.forEach(function(t){var v=stAt(h,t.rid);if(typeof v==="number")vals.push(v)})});
+if(vals.length<2)return "";
+var lo=Math.min.apply(null,vals),hi=Math.max.apply(null,vals);if(hi===lo){lo-=1;hi+=1}
+function spark(t){var pts=H.map(function(h){return stAt(h,t.rid)});
+var W=120,Ht=28,p=[],lab=[];pts.forEach(function(v,i){if(typeof v!=="number")return;var x=H.length===1?0:i/(H.length-1)*W;var y=Ht-((v-lo)/(hi-lo))*Ht;p.push(x.toFixed(1)+","+y.toFixed(1));lab.push((H[i].live?"W"+H[i].week+"*":"W"+H[i].week)+" "+f1(v))});
+return '<svg class="spark" width="120" height="28" viewBox="0 0 120 28" role="img" aria-label="'+esc(lab.join(", "))+'"><polyline points="'+p.join(" ")+'"/></svg>'}
+var rows=T.map(function(t){var nums=H.map(function(h){return stAt(h,t.rid)}).filter(function(v){return typeof v==="number"});
+return {t:t,now:nums.length?nums[nums.length-1]:null,chg:nums.length>1?nums[nums.length-1]-nums[0]:null}});
+rows.sort(function(a,b){return (b.chg==null?-1e9:b.chg)-(a.chg==null?-1e9:a.chg)});
+function sg(v){if(v==null)return "\u2014";var r=Math.round(v*10)/10;return (r>0?"+":r<0?"\u2212":"")+Math.abs(r).toFixed(1)}
+var h='<section><h2>Strength trend</h2><p class="cap">Projected points per week for the rest of the regular season after each completed week. The last point is the current strength, which leaves the in-progress week out of that average. The scale is the same for every team, so a rising line is a roster getting stronger.</p>';
+h+='<div class="scroll"><table><thead><tr><th>Team</th><th>Trend</th><th>Now</th><th>Since week '+H[0].week+'</th></tr></thead><tbody>';
+rows.forEach(function(x){h+='<tr><td>'+named(x.t)+'</td><td>'+spark(x.t)+'</td><td>'+(x.now==null?"\u2014":f1(x.now))+'</td><td>'+sg(x.chg)+'</td></tr>'});
+return h+"</tbody></table></div></section>"}
 window.buildPower=function(D){
 var KEY=D.key||"best",TITLE=D.title||"Best League",HASBEN=KEY==="best",NB=D.nbye==null?2:D.nbye;
 var T=D.teams,by={};T.forEach(function(t){by[t.rid]=t});
@@ -146,6 +173,8 @@ h.push('<section><h2>Methodology</h2><ul class="meth">'+
 '<li><b>Standings:</b> wins, then points for. Top '+D.nplay+' of '+(D.nteams||T.length)+' make it; '+(NB?(NB>1?'seeds ':'seed ')+rng(1,NB)+' '+(NB>1?'get':'gets')+' a bye; ':'')+'Sleeper\u2019s fixed bracket (no reseeding)'+(D.bracket?': '+D.bracket.filter(function(x){return x.r===1}).map(function(x){return [x.a,x.b].map(function(v){return +v.replace("seed ","")}).sort(function(p,q){return p-q}).join("v")}).join(", ")+' in round 1':'')+'; title odds simulate weeks '+D.pstart+'\u2013'+D.end+'.</li>'+
 '<li><b>Odds and simulation:</b> see the bullets above the odds chart. Week '+D.cur+' keeps points already scored.</li>'+
 '<li><b>Caveat:</b> projections and injury timelines are estimates; future trades aren\u2019t modeled and waiver pickups only fill in for injuries. Data: Sleeper.</li></ul></section>');
+h.push(stakeSection(D,T,by));
+h.push(trendSection(D,T));
 return h.join("");
 };
 })();

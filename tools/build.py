@@ -998,3 +998,323 @@ def asof_text(src):
     k = src.get("kicker_props_asof")
     bits.append("kicker props as of %s UTC" % _fmt(parse_iso(k), "UTC") if k else "kicker props not available")
     return "; ".join(bits) + "."
+
+
+# ------------------------------------------------------------------ playoff schedule, trades, waivers
+PLAYOFF_WEEKS = (15, 16, 17)
+SOS_POS = ("QB", "RB", "WR", "TE", "K", "DEF")
+SKILL_POS = ("QB", "RB", "WR", "TE")
+SIT_STATUS = {"IR", "PUP", "SUS", "NA"}
+SOS_NOTE = ("Playoff SOS is Weeks 15-17 opponent fantasy points allowed to that position, divided by the league average of the same number. "
+            "Above 1.00 is an easier slate. A dash means the player's team, a playoff opponent, or the points-allowed baseline was missing.")
+
+
+def score_stats(S, stats, pos):
+    """League points for one stat line. Kickers use the kicking buckets; everyone else uses the scoring keys that are set."""
+    if pos == "K":
+        return score_kicker(S, stats or {})
+    return sum(S[k] * v for k, v in (stats or {}).items() if k in S and S[k] and isinstance(v, (int, float)) and not isinstance(v, bool))
+
+
+def schedule_complete(schedule, week):
+    gs = [g for g in schedule or [] if g.get("week") == week]
+    return bool(gs) and all(g.get("status") == "complete" for g in gs)
+
+
+def week_matchups(schedule):
+    """{week: {nfl team: opponent}} using the same team codes as the rest of the report."""
+    out = {}
+    for g in schedule or []:
+        w, h, a = g.get("week"), g.get("home"), g.get("away")
+        if w is None or not h or not a:
+            continue
+        out.setdefault(w, {})
+        out[w][team_norm(h)] = team_norm(a)
+        out[w][team_norm(a)] = team_norm(h)
+    return out
+
+
+def points_allowed(schedule, week_stats, pos_of, score_fn, weeks):
+    """Average fantasy points each NFL team allowed to a position group, per game it played.
+
+    week_stats: {week: [ {player_id, team, stats}, ... ]} for weeks that are already final.
+    A position group's points are the sum of every player at that position who faced the team.
+    Returns (by_team, league). by_team[team][pos] is that average. league[pos] is the average
+    across team-games. A position with no team-game is left out of league.
+    """
+    opp = week_matchups(schedule)
+    tot, games = {}, {}
+    for w in weeks:
+        pairs = opp.get(w) or {}
+        if not pairs:
+            continue
+        for tm in pairs:
+            games[tm] = games.get(tm, 0) + 1
+        for e in week_stats.get(w) or []:
+            tm = team_norm(e.get("team") or "")
+            if not tm or tm not in pairs:
+                continue
+            pos = pos_of(e.get("player_id"))
+            if pos not in SOS_POS:
+                continue
+            dst = pairs[tm]
+            bucket = tot.setdefault(dst, {})
+            bucket[pos] = bucket.get(pos, 0.0) + float(score_fn(e.get("stats") or {}, pos) or 0)
+    by, league_pts, league_g = {}, {p: 0.0 for p in SOS_POS}, {p: 0 for p in SOS_POS}
+    for tm, n in games.items():
+        if n <= 0:
+            continue
+        by[tm] = {}
+        for p in SOS_POS:
+            pts = (tot.get(tm) or {}).get(p, 0.0)
+            by[tm][p] = pts / n
+            league_pts[p] += pts
+            league_g[p] += n
+    league = {p: league_pts[p] / league_g[p] for p in SOS_POS if league_g[p]}
+    return by, league
+
+
+def playoff_index(team, pos, schedule, allowed, league, weeks=PLAYOFF_WEEKS):
+    """Mean points the playoff opponents allow to this position, divided by the league average.
+
+    Byes are skipped. None when the team, the position, or every playoff opponent is missing.
+    Nothing is filled in from a guess.
+    """
+    if not team or pos not in SOS_POS or not league or not league.get(pos):
+        return None
+    opp = week_matchups(schedule)
+    vals = []
+    for w in weeks:
+        other = (opp.get(w) or {}).get(team_norm(team))
+        if not other:
+            continue
+        cell = (allowed.get(other) or {}).get(pos)
+        if cell is None:
+            continue
+        vals.append(cell)
+    if not vals:
+        return None
+    return round((sum(vals) / len(vals)) / league[pos], 2)
+
+
+def apply_sos(groups, allowed, league, schedule, weeks=PLAYOFF_WEEKS):
+    for rows in groups:
+        for r in rows or []:
+            r["sos"] = playoff_index(r.get("team"), r.get("pos"), schedule, allowed, league, weeks)
+
+
+def positional_rank(pos, text):
+    """Integer rank from a FantasyPros positional label such as 'RB18'. None when the label is a different position."""
+    if text is None or not pos:
+        return None
+    raw = str(text).strip().upper().replace("-", "")
+    m = re.match(r"^([A-Z]+)?\s*(\d+)$", raw)
+    if not m:
+        return None
+    prefix, num = m.group(1), int(m.group(2))
+    if num < 1:
+        return None
+    if prefix and prefix != str(pos).upper():
+        return None
+    return num
+
+
+def _sitting(status):
+    return str(status or "").strip().upper() in SIT_STATUS
+
+
+def _player_identity(pid, players, proj_row):
+    q = dict((players or {}).get(str(pid)) or {})
+    pl = (proj_row or {}).get("player") or {}
+    if proj_row and proj_row.get("team"):
+        q["team"] = proj_row["team"]
+    if not q.get("position") and pl.get("position"):
+        q["position"] = pl["position"]
+    if pl.get("injury_status"):
+        q["injury_status"] = pl["injury_status"]
+    if not q.get("full_name"):
+        q["full_name"] = ((pl.get("first_name") or "") + " " + (pl.get("last_name") or "")).strip()
+    pos = q.get("position") or ""
+    name = (q.get("full_name") or str(pid)).replace(" Sr.", "").strip() or str(pid)
+    if pos == "DEF" and q.get("team"):
+        name = q["team"] + " D/ST"
+    return name, pos, q.get("team") or "", q.get("injury_status") or ""
+
+
+def roster_values(rosters, players, lookup, proj_by_pid, score_fn):
+    """pid -> {name, pos, team, rank, status, proj}.
+
+    rank is the rest-of-season positional rank when lookup returns one.
+    When no rostered player has one, rank is 1..n by full-season projection among
+    rostered players at that position (1 = highest). The second return is 'ros',
+    'proj', or 'none', so the report can say which one it used.
+    """
+    ids, seen = [], set()
+    for r in rosters or []:
+        for bucket in ("players", "reserve", "taxi"):
+            for pid in r.get(bucket) or []:
+                pid = str(pid)
+                if pid and pid != "0" and pid not in seen:
+                    seen.add(pid)
+                    ids.append(pid)
+    values = {}
+    for pid in ids:
+        proj_row = (proj_by_pid or {}).get(pid)
+        name, pos, team, status = _player_identity(pid, players, proj_row)
+        rank = None
+        if lookup and pos:
+            hit = lookup(name, team, pos)
+            if hit:
+                rank = positional_rank(pos, hit[1] if len(hit) > 1 else None)
+        proj = None
+        stats = (proj_row or {}).get("stats") if proj_row else None
+        if stats and pos and score_fn:
+            try:
+                proj = float(score_fn(stats, pos))
+            except (TypeError, ValueError):
+                proj = None
+        values[pid] = dict(name=name, pos=pos, team=team, rank=rank, status=status or "", proj=proj)
+    if any(isinstance(v.get("rank"), int) and not isinstance(v.get("rank"), bool) for v in values.values()):
+        return values, "ros"
+    by_pos = {}
+    for pid, v in values.items():
+        if v.get("pos") and isinstance(v.get("proj"), (int, float)) and not isinstance(v.get("proj"), bool):
+            by_pos.setdefault(v["pos"], []).append(pid)
+    ranked = False
+    for pids in by_pos.values():
+        pids.sort(key=lambda pid: (-values[pid]["proj"], values[pid]["name"], pid))
+        for i, pid in enumerate(pids, 1):
+            values[pid]["rank"] = i
+            ranked = True
+    return values, ("proj" if ranked else "none")
+
+
+def _owner_name(users, roster):
+    u = next((u for u in users or [] if u.get("user_id") == roster.get("owner_id")), None) or {}
+    md = u.get("metadata") or {}
+    name = (md.get("team_name") or u.get("display_name") or u.get("username") or "").strip()
+    user = (u.get("display_name") or u.get("username") or "").strip()
+    return name or ("Team %s" % roster.get("roster_id")), user
+
+
+def trade_targets(rosters, users, user_id, values, slots, nteams, source):
+    """Other teams that are deep where this user's team is thin, and the spare players.
+
+    Starter-quality means a positional rank at or better than one per dedicated starting
+    slot across the league (12 teams and 2 RB slots -> RB24 or better). IR, PUP, Sus and
+    NA do not count. A team is thin when it has fewer starter-quality players than its
+    dedicated slots, and deep when it has more. Candidates are the extras past the
+    players that team needs for its own slots, best rank first. The user's own players
+    are never candidates.
+    """
+    slots = [s for s in (slots or []) if s not in ("BN", "IR", "TAXI")]
+    dedicated = {p: sum(1 for s in slots if s == p) for p in SKILL_POS}
+    me = next((r for r in rosters or [] if str(r.get("owner_id")) == str(user_id)), None)
+    label = {"ros": "FantasyPros rest-of-season positional rank",
+             "proj": "Sleeper full-season projection (rest-of-season ranks were missing)"}.get(source, source or "")
+
+    def held(r):
+        out, seen = [], set()
+        for bucket in ("players", "reserve"):
+            for pid in r.get(bucket) or []:
+                pid = str(pid)
+                if pid and pid != "0" and pid not in seen:
+                    seen.add(pid)
+                    out.append(pid)
+        return out
+
+    if me is None:
+        return dict(team="", user="", source=label, positions=[], note="Your roster was not in this league, so no trade target was named.")
+    my_name, my_user = _owner_name(users, me)
+    ranked = [v for v in (values or {}).values() if isinstance(v.get("rank"), int) and not isinstance(v.get("rank"), bool)]
+    if not ranked:
+        return dict(team=my_name, user=my_user, source=label, positions=[],
+                    note="No rest-of-season ranks or projections were available, so no trade target was named.")
+    try:
+        nteams = int(nteams)
+    except (TypeError, ValueError):
+        nteams = 0
+    if nteams < 1:
+        return dict(team=my_name, user=my_user, source=label, positions=[], note="League size was missing, so no trade target was named.")
+
+    def quality(r, pos, bar):
+        rows = []
+        for pid in held(r):
+            v = (values or {}).get(pid) or {}
+            if v.get("pos") != pos:
+                continue
+            rank = v.get("rank")
+            rank = rank if isinstance(rank, int) and not isinstance(rank, bool) else None
+            ok = rank is not None and 1 <= rank <= bar and not _sitting(v.get("status"))
+            rows.append(dict(name=v.get("name") or pid, rank=rank, nfl=v.get("team") or "", startable=bool(ok)))
+        rows.sort(key=lambda x: (not x["startable"], x["rank"] is None, x["rank"] if x["rank"] is not None else 10 ** 9, x["name"]))
+        return rows
+
+    positions = []
+    for pos in SKILL_POS:
+        need = dedicated[pos]
+        if need <= 0:
+            continue
+        bar = nteams * need
+        mine = quality(me, pos, bar)
+        have = sum(1 for x in mine if x["startable"])
+        if have >= need:
+            continue
+        teams = []
+        for r in rosters or []:
+            if r.get("roster_id") == me.get("roster_id"):
+                continue
+            theirs = [x for x in quality(r, pos, bar) if x["startable"]]
+            if len(theirs) <= need:
+                continue
+            name, user = _owner_name(users, r)
+            teams.append(dict(name=name, user=user, have=len(theirs),
+                              candidates=[dict(name=c["name"], rank=c["rank"], nfl=c["nfl"]) for c in theirs[need:need + 3]]))
+        teams.sort(key=lambda t: (-t["have"], t["candidates"][0]["rank"] if t["candidates"] else 10 ** 9, t["name"]))
+        yours = sorted(mine, key=lambda x: (x["rank"] is None, x["rank"] if x["rank"] is not None else 10 ** 9, x["name"]))
+        positions.append(dict(pos=pos, need=need, have=have, bar=bar,
+                              yours=[dict(name=x["name"], rank=x["rank"], nfl=x["nfl"], startable=x["startable"]) for x in yours[:8]],
+                              teams=teams[:4]))
+    note = "" if positions else "No position is short of starter-quality players."
+    return dict(team=my_name, user=my_user, source=label, positions=positions, note=note)
+
+
+def waiver_snapshot(league, rosters, users, user_id):
+    """FAAB remaining, or waiver priority when the league does not use FAAB.
+
+    Sleeper waiver_type 0 is rolling priority even when a budget number is set.
+    Remaining is the league budget minus waiver_budget_used. A negative used
+    amount is left as Sleeper reported it.
+    """
+    st = (league or {}).get("settings") or {}
+    try:
+        wtype = int(st.get("waiver_type") or 0)
+    except (TypeError, ValueError):
+        wtype = 0
+    try:
+        budget = int(st.get("waiver_budget") or 0)
+    except (TypeError, ValueError):
+        budget = 0
+    faab = wtype != 0 and budget > 0
+    rows = []
+    for r in rosters or []:
+        s = r.get("settings") or {}
+        name, user = _owner_name(users, r)
+        you = str(r.get("owner_id")) == str(user_id)
+        if faab:
+            used = s.get("waiver_budget_used")
+            if isinstance(used, bool) or not isinstance(used, (int, float)):
+                used_n, rem = None, None
+            else:
+                used_n = int(used) if float(used) == int(used) else used
+                rem = budget - used_n
+            rows.append(dict(name=name, user=user, you=you, used=used_n, remaining=rem))
+        else:
+            pos = s.get("waiver_position")
+            pos = None if isinstance(pos, bool) or not isinstance(pos, (int, float)) else int(pos)
+            rows.append(dict(name=name, user=user, you=you, priority=pos))
+    if faab:
+        rows.sort(key=lambda x: (x["remaining"] is None, -(x["remaining"] if x["remaining"] is not None else 0), x["name"]))
+        return dict(mode="faab", budget=budget, rows=rows)
+    rows.sort(key=lambda x: (x["priority"] is None, x["priority"] if x["priority"] is not None else 10 ** 9, x["name"]))
+    return dict(mode="priority", rows=rows)
