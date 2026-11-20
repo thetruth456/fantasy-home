@@ -124,7 +124,7 @@ function note(t){
  return "Playing spoiler"}
 var h=[];
 h.push('<h1>'+esc(TITLE)+' power rankings: Week '+D.cur+'</h1>');
-h.push('<p class="asof">Snapshot as of '+esc(ptTime(D.asof))+'.'+(window.PODCAST_STANDALONE?'':' Use Refresh to regenerate all four leagues. The hourly update does not change this view.')+'</p>');
+h.push('<p class="asof">Snapshot as of '+esc(ptTime(D.asof))+'.'+(window.PODCAST_STANDALONE?'':' Use Refresh to regenerate all four leagues. The scheduled update also rewrites this view.')+'</p>');
 
 /* ---- odds through the season first (chart, toggle, legend, then how the odds are built) */
 h.push(oddsChart(D));

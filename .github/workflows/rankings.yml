@@ -1,8 +1,9 @@
 name: Refresh power rankings and luck
 
-# On-demand only. The Refresh button on the Power Rankings and Luck tabs
-# dispatches this workflow. It rewrites the eight public snapshots and
-# leaves the encrypted weekly reports alone.
+# On-demand path for the Refresh button on the Power Rankings and Luck tabs.
+# The daily run is update.yml, on the same clock as the weekly reports. This
+# workflow still rewrites only the eight public snapshots and leaves the
+# encrypted weekly reports alone.
 #
 # Model settings stay as the tools already have them: Best League is frozen
 # in tools/leagues.py, and the other leagues use tools/power_cal.json.

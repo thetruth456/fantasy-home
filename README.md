@@ -4,7 +4,7 @@ Static site (plain HTML/CSS/JS, no build step, no external resources) at https:/
 
 ## How the data stays current
 
-A GitHub Action (`.github/workflows/update.yml`) runs `python tools/update.py` on a GitHub-hosted runner, rewrites the four `*-report.js` data files and commits them to `main` only when something changed. Public-repo runners are free, so this costs nothing.
+A GitHub Action (`.github/workflows/update.yml`) runs `python tools/update.py` on a GitHub-hosted runner, rewrites the four `*-report.js` data files, and on the same gate regenerates the eight power and luck snapshots. It commits each set to `main` only when that set changed. Public-repo runners are free, so this costs nothing.
 
 | What | Source | Where it ends up |
 | --- | --- | --- |
@@ -23,13 +23,15 @@ The pages hold no week-specific text: `report-core.js` fills the title, as-of li
 
 ### Schedule and gate
 
-The workflow cron is `0 * * * *` (every hour, UTC) plus manual `workflow_dispatch`. `tools/update.py` converts the time to `America/Los_Angeles` and decides:
+The workflow cron is `17 * * * *` (every hour, at minute 17 UTC) plus manual `workflow_dispatch`. `tools/update.py` converts the time to `America/Los_Angeles` and decides:
 
-* Saturday 1:00 PM PT through Sunday 10:59 AM PT: run (hourly).
-* Any other time: run only in the 9 AM PT hour (once a day); otherwise exit without touching anything.
+* Saturday 1:00 PM PT through Sunday 10:59 AM PT: run (hourly). Reports and power/luck both run.
+* Any other time at or after 9:00 AM PT: run, but at most once per Pacific date. A weekday therefore refreshes on the first cron tick that lands at or after 9 AM, even when GitHub misses the 9:00 hour. The once-per-date check looks for a commit that already touched that set of files (the four `*-report.js` files, or the eight power/luck files) on today's Pacific date. Saturday morning and Sunday afternoon use the same once-per-date check, so they do not turn into a second hourly window. Before 9:00 AM PT, outside the weekend window, the run exits without writing.
 * `FORCE=true` (the workflow's `force` input, which the site button sets) skips the gate.
 
-Because the gate uses local Pacific time, the Nov 1 DST change needs no edit. If nothing but timestamps would change, nothing is written and nothing is committed (unless forced).
+Power rankings and luck (`tools/podcast.py --league all`, then `tools/power.py --league all`) run in this same workflow when their own gate says yes. The job timeout is 40 minutes. The Refresh button on those tabs still dispatches `.github/workflows/rankings.yml` on its own.
+
+Because the gate uses local Pacific time, the Nov 1 DST change needs no edit. If nothing but timestamps would change, the weekly report is not rewritten and not committed (unless forced). Power and luck snapshots include an as-of time, so a run that regenerates them commits when that time changes.
 
 ### Failure handling
 
@@ -118,7 +120,7 @@ Each Power Rankings tab and each Luck tab has a **Refresh** button. It asks GitH
 
 Every league (each tab of `index.html`, and the standalone `best-league.html`, `zbt.html`, `oopsilons.html`, `spacex-ff.html`) has three sub-tabs, in this order: **Power Rankings** (the default), **Luck report** and **Weekly report**. Power Rankings and the luck report are open to everyone; only the Weekly report asks for the password (see below), and only when it is clicked. Links on the home page: `#<league>` (Power Rankings), `#<league>-luck`, `#<league>-report`, with league = `best`, `zbt`, `oops` or `spacex`; older links `#<league>-power` and `#<league>-podcast` (luck) still work. Standalone pages use `#power`, `#luck` (or `#podcast`) and `#report`; no hash opens Power Rankings.
 
-Both views are static snapshots. `python tools/podcast.py --league KEY [last_week]` writes `<key>-podcast-data.js` (Sleeper data only, rendered by `podcast.js`) and `python tools/power.py --league KEY [sims]` writes `<key>-power-data.js` (rendered by `power.js`); `--league all` does every league in `tools/leagues.py` (default `best`). The hourly update only commits `*-report.js`, and Refresh everything only reloads those files. **Refresh** on the Power Rankings and Luck tabs runs `.github/workflows/rankings.yml`, which reruns both tools for all four leagues and commits the eight snapshot files. Running the two tools by hand still works. Both tools count a week as completed once every NFL game of that week is final in Sleeper's scores feed, even before the league's `last_scored_leg` moves (usually the next morning). Injury misses are charged to the team holding the player that week; long-term return timelines live in `LONG_TERM` in `tools/podcast.py` (with source links) and need a manual check before each re-run. The W8* (current week) point uses the live week: Sleeper's `matchups/<week>` points for starters whose game is over (final) or under way (points so far, plus the rest of their value scaled by the game time left from Sleeper's scores feed), and simulates only players still to play; the current week comes from `last_scored_leg` + 1, checked against `/state/nfl`. The odds charts show each team's record next to its line label and in the legend (`(W-L)`, or `W-L-T` with ties), from completed weeks only (`last`, Sleeper's last scored week; the caption says which week); hover shows the record after each week. These come from the `recs` field (`{roster_id: [[W,L,T] after week 1, ...]}`) that `tools/power.py` writes; `python tools/records.py [--league KEY|all]` appends just that field to an existing power data file without re-running the simulation.
+Both views are static snapshots. `python tools/podcast.py --league KEY [last_week]` writes `<key>-podcast-data.js` (Sleeper data only, rendered by `podcast.js`) and `python tools/power.py --league KEY [sims]` writes `<key>-power-data.js` (rendered by `power.js`); `--league all` does every league in `tools/leagues.py` (default `best`). The scheduled update commits `*-report.js` and, on the same gate, the eight power and luck snapshots. Refresh everything runs that workflow with `force=true`. **Refresh** on the Power Rankings and Luck tabs runs `.github/workflows/rankings.yml`, which reruns both tools for all four leagues and commits the eight snapshot files. Running the two tools by hand still works. Both tools count a week as completed once every NFL game of that week is final in Sleeper's scores feed, even before the league's `last_scored_leg` moves (usually the next morning). Injury misses are charged to the team holding the player that week; long-term return timelines live in `LONG_TERM` in `tools/podcast.py` (with source links) and need a manual check before each re-run. The W8* (current week) point uses the live week: Sleeper's `matchups/<week>` points for starters whose game is over (final) or under way (points so far, plus the rest of their value scaled by the game time left from Sleeper's scores feed), and simulates only players still to play; the current week comes from `last_scored_leg` + 1, checked against `/state/nfl`. The odds charts show each team's record next to its line label and in the legend (`(W-L)`, or `W-L-T` with ties), from completed weeks only (`last`, Sleeper's last scored week; the caption says which week); hover shows the record after each week. These come from the `recs` field (`{roster_id: [[W,L,T] after week 1, ...]}`) that `tools/power.py` writes; `python tools/records.py [--league KEY|all]` appends just that field to an existing power data file without re-running the simulation.
 
 **Best League model frozen.** The user asked not to change the Best League model until they say so. `FROZEN` in `tools/leagues.py` keeps Best on the settings its live files were made with: TAU0 4.6 (instead of the 5.5 from `tools/power_cal.json`) and the injury list as checked Oct 31 (`LONG_TERM_OCT31` in `tools/podcast.py`, no `ACTIVATED` overrides). Both Best files were re-run after week 8 (Nov 2, night) with these frozen settings (fresh Sleeper inputs only). Remove the `best` entry from `FROZEN` to put Best on the current list and calibration.
 
@@ -142,7 +144,7 @@ Only the weekly reports (rosters, lineups, waivers) are behind a password. The w
 * `podcast.js` (sub-tabs, luck report), `power.js` (Power Rankings and odds charts); data: `<key>-podcast-data.js`, `<key>-power-data.js` (plaintext snapshots from `tools/podcast.py` / `tools/power.py`).
 * `*-report.js`: generated data files. Do not edit by hand; changes are overwritten by the next run.
 * `tools/`: `update.py` (orchestration and gate), `sources.py` (Sleeper, Fieldwork, FantasyPros, ESPN fetchers), `build.py` (scoring, props, ranks, waiver list, text), `keepers.py` (Best League and Oopsilons top-keeper table), `overrides.json`.
-* `.github/workflows/update.yml`: the hourly weekly-report schedule. `.github/workflows/rankings.yml`: on-demand power rankings and luck.
+* `.github/workflows/update.yml`: the hourly schedule for weekly reports and for power rankings and luck. `.github/workflows/rankings.yml`: on-demand power rankings and luck.
 
 ## Week roll-over
 

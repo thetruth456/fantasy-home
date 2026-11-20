@@ -973,6 +973,128 @@ initReport("best");
     return dest / "index.html"
 
 
+def _pt(y, m, d, h, mi=0):
+    return dt.datetime(y, m, d, h, mi, tzinfo=update.PT)
+
+
+class ScheduleGate(unittest.TestCase):
+    def test_weekday_runs_any_time_after_9_until_a_commit_exists(self):
+        early, nine, afternoon = _pt(2026, 11, 20, 8, 59), _pt(2026, 11, 20, 9, 0), _pt(2026, 11, 20, 15, 17)
+        self.assertEqual(early.weekday(), 4)
+        self.assertFalse(update.should_run(early, False, False)[0])
+        ok, why = update.should_run(nine, False, False)
+        self.assertTrue(ok)
+        self.assertEqual(why, "daily run at or after 9 AM PT")
+        self.assertTrue(update.should_run(afternoon, False, False)[0])
+        self.assertFalse(update.should_run(nine, False, True)[0])
+        self.assertFalse(update.should_run(afternoon, False, True)[0])
+        self.assertEqual(update.should_run(afternoon, False, True)[1], "already committed for this PT date")
+        self.assertTrue(update.should_run(early, True, True)[0])
+        self.assertTrue(update.should_run(afternoon, True, True)[0])
+
+    def test_weekend_window_stays_hourly_and_outside_it_is_once_per_date(self):
+        self.assertFalse(update.should_run(_pt(2026, 11, 21, 8, 0), False, False)[0])
+        self.assertTrue(update.should_run(_pt(2026, 11, 21, 9, 0), False, False)[0])
+        self.assertFalse(update.should_run(_pt(2026, 11, 21, 12, 59), False, True)[0])
+        ok, why = update.should_run(_pt(2026, 11, 21, 13, 0), False, True)
+        self.assertTrue(ok)
+        self.assertIn("hourly window", why)
+        self.assertTrue(update.should_run(_pt(2026, 11, 21, 23, 0), False, True)[0])
+        self.assertTrue(update.should_run(_pt(2026, 11, 22, 0, 0), False, True)[0])
+        self.assertTrue(update.should_run(_pt(2026, 11, 22, 10, 59), False, True)[0])
+        self.assertTrue(update.should_run(_pt(2026, 11, 22, 11, 0), False, False)[0])
+        self.assertFalse(update.should_run(_pt(2026, 11, 22, 15, 0), False, True)[0])
+        self.assertFalse(update.should_run(_pt(2026, 11, 23, 8, 0), False, False)[0])
+        self.assertTrue(update.should_run(_pt(2026, 11, 23, 9, 30), False, False)[0])
+        self.assertFalse(update.should_run(_pt(2026, 11, 23, 18, 0), False, True)[0])
+
+    def test_committed_on_uses_the_pacific_date(self):
+        with tempfile.TemporaryDirectory() as d:
+            subprocess.check_call(["git", "init", "-b", "main"], cwd=d, stdout=subprocess.DEVNULL)
+
+            def commit(name, body, when):
+                (Path(d) / name).write_text(body)
+                env = os.environ.copy()
+                env.update(GIT_AUTHOR_DATE=when, GIT_COMMITTER_DATE=when,
+                           GIT_AUTHOR_NAME="Test", GIT_AUTHOR_EMAIL="t@example.com",
+                           GIT_COMMITTER_NAME="Test", GIT_COMMITTER_EMAIL="t@example.com")
+                subprocess.check_call(["git", "add", name], cwd=d, env=env, stdout=subprocess.DEVNULL)
+                subprocess.check_call(
+                    ["git", "-c", "user.name=Test", "-c", "user.email=t@example.com", "commit", "-m", "data"],
+                    cwd=d, env=env, stdout=subprocess.DEVNULL)
+
+            commit("best-league-report.js", "report\n", "2026-11-20T23:30:00-08:00")
+            commit("best-power-data.js", "power\n", "2026-11-21T00:30:00-08:00")
+            commit("zbt-report.js", "thu\n", "2026-11-20T07:30:00Z")
+            fri_night = _pt(2026, 11, 20, 23, 45)
+            sat_morning = _pt(2026, 11, 21, 0, 45)
+            thu_night = _pt(2026, 11, 19, 23, 45)
+            fri_morning = _pt(2026, 11, 20, 8, 0)
+            self.assertTrue(update.committed_on(fri_night, update.REPORT_FILES, root=d))
+            self.assertFalse(update.committed_on(sat_morning, update.REPORT_FILES, root=d))
+            self.assertFalse(update.committed_on(fri_night, update.RANK_FILES, root=d))
+            self.assertTrue(update.committed_on(sat_morning, update.RANK_FILES, root=d))
+            self.assertTrue(update.committed_on(thu_night, ["zbt-report.js"], root=d))
+            self.assertFalse(update.committed_on(fri_morning, ["zbt-report.js"], root=d))
+            self.assertFalse(update.committed_on(fri_night, ["does-not-exist.js"], root=d))
+
+    def test_skip_writes_outputs_without_a_password(self):
+        keys = ("FH_REPORT_PASSWORD", "FORCE", "FH_NOW", "GITHUB_OUTPUT")
+        saved = {k: os.environ.get(k) for k in keys}
+        fd, path = tempfile.mkstemp()
+        os.close(fd)
+        os.environ.pop("FH_REPORT_PASSWORD", None)
+        os.environ["FORCE"] = "false"
+        os.environ["FH_NOW"] = "2026-11-20T15:30:00Z"  # Friday 7:30 AM PT
+        os.environ["GITHUB_OUTPUT"] = path
+        try:
+            self.assertEqual(update.main(), 0)
+            text = Path(path).read_text()
+            self.assertIn("reports=false\n", text)
+            self.assertIn("rankings=false\n", text)
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+            os.remove(path)
+
+    def test_rankings_stay_due_when_only_the_reports_were_committed(self):
+        keys = ("FH_REPORT_PASSWORD", "FORCE", "FH_NOW", "GITHUB_OUTPUT")
+        saved = {k: os.environ.get(k) for k in keys}
+        fd, path = tempfile.mkstemp()
+        os.close(fd)
+        orig = update.committed_on
+
+        def only_reports(now_pt, paths, root=None):
+            return "best-league-report.js" in list(paths)
+
+        update.committed_on = only_reports
+        os.environ.pop("FH_REPORT_PASSWORD", None)
+        os.environ["FORCE"] = "false"
+        os.environ["FH_NOW"] = "2026-11-20T23:00:00Z"  # Friday 3:00 PM PT
+        os.environ["GITHUB_OUTPUT"] = path
+        try:
+            self.assertEqual(update.main(), 0)
+            text = Path(path).read_text()
+            self.assertIn("reports=false\n", text)
+            self.assertIn("rankings=true\n", text)
+        finally:
+            update.committed_on = orig
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+            os.remove(path)
+
+    def test_gate_does_not_log_the_report_password(self):
+        for line in (ROOT / "tools" / "update.py").read_text().splitlines():
+            if "log(" in line and "PASSWORD" in line:
+                self.fail(line)
+
+
 class RankingsRefresh(unittest.TestCase):
     def test_week_counts_only_when_every_game_is_final(self):
         orig = sources.sleeper_scores
@@ -1018,6 +1140,34 @@ class RankingsRefresh(unittest.TestCase):
             self.assertIn(name, text)
         self.assertIn("git push", text)
         self.assertIn("grep -vxE", text)
+
+    def test_update_workflow_refreshes_power_and_luck_on_the_same_gate(self):
+        text = (ROOT / ".github/workflows/update.yml").read_text()
+        self.assertIn('cron: "17 * * * *"', text)
+        self.assertIn("timeout-minutes: 40", text)
+        self.assertIn("fetch-depth: 0", text)
+        self.assertIn("python tools/podcast.py --league all\n", text)
+        self.assertIn("python tools/power.py --league all\n", text)
+        self.assertLess(text.find("python tools/podcast.py --league all"), text.find("python tools/power.py --league all"))
+        self.assertIn("steps.update.outputs.rankings == 'true'", text)
+        self.assertIn("steps.rankings.outcome == 'success'", text)
+        self.assertIn("FH_REPORT_PASSWORD: ${{ secrets.FH_REPORT_PASSWORD }}", text)
+        self.assertNotIn('echo "$FH_REPORT_PASSWORD"', text)
+        self.assertNotIn("echo $FH_REPORT_PASSWORD", text)
+        for name in update.RANK_FILES:
+            self.assertIn(name, text)
+        self.assertIn("python tools/seal.py verify", text)
+        self.assertNotIn("tools/power_cal.json", text)
+        self.assertNotIn("tools/lock.json", text)
+        self.assertNotIn("FH_POWER_TAU0", text)
+        for fn in ("power.js", "podcast.js"):
+            src = (ROOT / fn).read_text()
+            self.assertNotIn("hourly update does not", src)
+            self.assertIn("scheduled update also rewrites this view", src)
+        for fn in ("power.py", "podcast.py"):
+            src = (ROOT / "tools" / fn).read_text()
+            self.assertNotIn("hourly update does not", src)
+            self.assertIn("daily update", src)
 
     def test_pages_load_rank_refresh_on_power_and_luck(self):
         for fn in ("index.html", "best-league.html", "zbt.html", "oopsilons.html", "spacex-ff.html"):

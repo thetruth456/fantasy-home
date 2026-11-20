@@ -1,9 +1,13 @@
 name: Update fantasy data
 
 # Runs every hour; tools/update.py decides whether this hour is worth a refresh:
-#   Saturday 1:00 PM PT through Sunday 10:00 AM PT -> every hour
-#   any other time                                 -> once a day, at the 9 AM PT run
-# The gate uses America/Los_Angeles local time, so the Nov 1 DST change needs no edit here.
+#   Saturday 1:00 PM PT through Sunday 10:59 AM PT -> every hour (reports and power/luck)
+#   any other run at or after 9:00 AM PT           -> once per Pacific date
+#   before 9:00 AM PT, outside that window         -> do nothing
+# The once-per-date check is separate for weekly reports and for power/luck, so a
+# report commit already on today's PT date does not block a missing rankings refresh.
+# GitHub's cron often misses the 9:00 hour; the first run at or after 9 AM PT still counts.
+# The gate uses America/Los_Angeles, so the DST change needs no edit here.
 # "Run workflow" (or the site's Refresh everything button) sets force=true and skips the gate.
 on:
   schedule:
@@ -27,9 +31,15 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Weekly reports plus power rankings and luck. Power + luck was about 2 minutes
+    # locally; 40 minutes leaves room for a slow runner and the report fetch.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The once-per-date gate reads today's commits. A depth-1 checkout would
+          # hide an earlier commit from the same Pacific date.
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -48,20 +58,22 @@ jobs:
           key: players-${{ steps.day.outputs.d }}
           restore-keys: players-
 
-      - name: Update data
+      - name: Update weekly reports
         id: update
         env:
           # workflow_dispatch passes the boolean as "true"/"false"; scheduled runs have no input and are gated
           FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force || 'false' }}
-          # data files are written encrypted with this password (tools/seal.py); missing or wrong -> the run fails, nothing is written
+          # Encrypted with the repository secret. The value is never printed.
           FH_REPORT_PASSWORD: ${{ secrets.FH_REPORT_PASSWORD }}
         run: python tools/update.py
 
       - name: Refuse to commit unencrypted data
+        if: steps.update.outputs.reports == 'true'
         run: python tools/seal.py verify
 
-      - name: Commit and push if data changed
-        id: commit
+      - name: Commit and push reports if they changed
+        id: commit-reports
+        if: steps.update.outputs.reports == 'true'
         run: |
           git config user.name "fantasy-data-bot"
           git config user.email "fantasy-data-bot@users.noreply.github.com"
@@ -83,10 +95,51 @@ jobs:
           echo "Could not push after 3 attempts" >&2
           exit 1
 
+      - name: Regenerate power rankings and luck
+        id: rankings
+        if: always() && steps.update.outputs.rankings == 'true'
+        run: |
+          python tools/podcast.py --league all
+          python tools/power.py --league all
+
+      - name: Commit and push power and luck if they changed
+        id: commit-rankings
+        if: always() && steps.rankings.outcome == 'success'
+        run: |
+          git config user.name "fantasy-data-bot"
+          git config user.email "fantasy-data-bot@users.noreply.github.com"
+          git add -- \
+            best-power-data.js best-podcast-data.js \
+            zbt-power-data.js zbt-podcast-data.js \
+            oops-power-data.js oops-podcast-data.js \
+            spacex-power-data.js spacex-podcast-data.js
+          extra=$(git diff --cached --name-only | grep -vxE '(best|zbt|oops|spacex)-(power|podcast)-data\.js' || true)
+          if [ -n "$extra" ]; then
+            echo "Refusing to commit unexpected files:" >&2
+            printf '%s\n' "$extra" >&2
+            exit 1
+          fi
+          if git diff --cached --quiet; then
+            echo "No power or luck change, nothing to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m "Refresh power rankings and luck $(date -u +'%Y-%m-%d %H:%M UTC')"
+          for i in 1 2 3; do
+            if git push; then
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Push rejected (attempt $i); rebasing and retrying"
+            git pull --rebase -X theirs origin "${GITHUB_REF_NAME}"
+          done
+          echo "Could not push after 3 attempts" >&2
+          exit 1
+
       - name: Ask GitHub Pages to rebuild (best effort)
         # Pushes made with GITHUB_TOKEN do not trigger other workflows, so a branch-based Pages deploy
         # may not rebuild by itself. This asks for a build; it is allowed to fail without failing the run.
-        if: steps.commit.outputs.changed == 'true'
+        if: always() && (steps.commit-reports.outputs.changed == 'true' || steps.commit-rankings.outputs.changed == 'true')
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
