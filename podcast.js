@@ -26,7 +26,7 @@ function gms(n){return n+' game'+(n===1?'':'s')}
 var wk=D.weeks[0]===D.weeks[1]?"Week "+D.weeks[0]:"Weeks "+D.weeks[0]+"\u2013"+D.weeks[1];
 var h=[];
 h.push('<h1>'+esc(D.title||"Best League")+' luck report: '+wk+'</h1>');
-h.push('<p class="asof">Snapshot as of '+esc(ptTime(D.asof))+'.'+(window.PODCAST_STANDALONE?'':' Use Refresh to regenerate all four leagues. The hourly update does not change this view.')+'</p>');
+h.push('<p class="asof">Snapshot as of '+esc(ptTime(D.asof))+'.'+(window.PODCAST_STANDALONE?'':' Use Refresh to regenerate all four leagues. The scheduled update also rewrites this view.')+'</p>');
 
 /* ---- headlines */
 var lucky=T[0],unlucky=T[T.length-1];

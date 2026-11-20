@@ -1,20 +1,25 @@
 #!/usr/bin/env python3
 """Rebuild the site's data files (*-report.js) from Sleeper, Fieldwork props and FantasyPros ranks.
 
-Run by .github/workflows/update.yml every hour; the schedule gate below decides whether an hourly run does anything.
+Run by .github/workflows/update.yml every hour. The schedule gate below decides
+whether that run rewrites the weekly reports. The same clock, with its own
+once-per-date check, is reported to the workflow as GITHUB_OUTPUT keys
+`reports` and `rankings` so the workflow can regenerate power rankings and luck.
 
 Environment:
   FORCE=true       skip the time gate and always write (the "Refresh everything" button sets this)
   FH_NOW=<iso>     pretend it is this UTC time (testing the gate)
   FH_OUT_DIR=<dir> write the data files here instead of the repo root (testing)
   FH_CACHE_DIR     where the Sleeper players dump is cached (default <repo>/.cache)
-  FH_REPORT_PASSWORD  required: data files are written encrypted (tools/seal.py); without it nothing is written
+  FH_REPORT_PASSWORD  required to write reports: files are encrypted (tools/seal.py); without it nothing is written
+  GITHUB_OUTPUT    when set, append reports=true/false and rankings=true/false
 
 Weather uses the public Open-Meteo forecast (no key) and the ESPN scoreboard for the real stadium.
 """
 import datetime as dt
 import json
 import os
+import subprocess
 import sys
 import time
 from zoneinfo import ZoneInfo
@@ -49,14 +54,85 @@ def in_hourly_window(now_pt):
     return (wd == 5 and h >= 13) or (wd == 6 and h <= 10)
 
 
-def should_run(now_pt, force):
+def should_run(now_pt, force, committed_today=False):
+    """Whether this invocation should write.
+
+    Saturday 1:00 PM PT through Sunday 10:59 AM PT stays hourly. Outside that
+    window, any run at or after 9:00 AM PT counts, so a drifted cron that misses
+    the 9:00 hour still refreshes. A weekday writes at most once: if a commit
+    already touched these files on today's Pacific date, skip. Saturday morning
+    and Sunday afternoon sit outside the hourly window, so they use that same
+    once-per-date check and do not become a second hourly window. FORCE skips
+    both checks. committed_today is ignored inside the hourly window.
+    """
     if force:
         return True, "forced"
     if in_hourly_window(now_pt):
         return True, "inside the Sat 1 PM - Sun 10 AM PT hourly window"
-    if now_pt.hour == 9:
-        return True, "daily 9 AM PT run"
-    return False, "outside the window and not the 9 AM PT daily run"
+    if now_pt.hour < 9:
+        return False, "outside the window and before 9 AM PT"
+    if committed_today:
+        return False, "already committed for this PT date"
+    return True, "daily run at or after 9 AM PT"
+
+
+REPORT_FILES = (
+    "best-league-report.js",
+    "zbt-report.js",
+    "oopsilons-report.js",
+    "spacex-report.js",
+)
+RANK_FILES = (
+    "best-power-data.js", "best-podcast-data.js",
+    "zbt-power-data.js", "zbt-podcast-data.js",
+    "oops-power-data.js", "oops-podcast-data.js",
+    "spacex-power-data.js", "spacex-podcast-data.js",
+)
+
+
+def committed_on(now_pt, paths, root=None):
+    """True when a commit touching one of paths has a committer time on now_pt's Pacific date.
+
+    A git failure does not skip the run: missing history should refresh, not stay stale.
+    """
+    root = root or ROOT
+    day = now_pt.astimezone(PT)
+    start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+    end = start + dt.timedelta(days=1)
+    try:
+        proc = subprocess.run(
+            ["git", "-C", root, "log", "--pretty=format:%cI", "--", *list(paths)],
+            capture_output=True, text=True, timeout=30, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as e:
+        log("WARNING: could not read commit dates (%s); not treating today as already done" % e)
+        return False
+    if proc.returncode != 0:
+        err = (proc.stderr or "").strip().splitlines()
+        log("WARNING: git log failed (%s); not treating today as already done" % (err[0] if err else proc.returncode))
+        return False
+    for line in proc.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            when = dt.datetime.fromisoformat(line)
+        except ValueError:
+            continue
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=dt.timezone.utc)
+        local = when.astimezone(PT)
+        if start <= local < end:
+            return True
+    return False
+
+
+def emit_output(key, value):
+    path = os.environ.get("GITHUB_OUTPUT")
+    if not path:
+        return
+    with open(path, "a", encoding="utf-8") as f:
+        f.write("%s=%s\n" % (key, "true" if value else "false"))
 
 
 # ------------------------------------------------------------------ data file io
@@ -110,10 +186,21 @@ def main():
     now = dt.datetime.now(dt.timezone.utc)
     if os.environ.get("FH_NOW"):
         now = dt.datetime.fromisoformat(os.environ["FH_NOW"].replace("Z", "+00:00"))
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=dt.timezone.utc)
     now_pt = now.astimezone(PT)
-    ok, why = should_run(now_pt, force)
-    log("Now %s UTC = %s PT (%s). Run? %s: %s" % (now.strftime("%Y-%m-%d %H:%M"), now_pt.strftime("%a %Y-%m-%d %H:%M %Z"), "forced" if force else "gated", "YES" if ok else "NO", why))
-    if not ok:
+    reports_today = committed_on(now_pt, REPORT_FILES)
+    rankings_today = committed_on(now_pt, RANK_FILES)
+    reports_ok, why = should_run(now_pt, force, reports_today)
+    rankings_ok, why_rank = should_run(now_pt, force, rankings_today)
+    emit_output("reports", reports_ok)
+    emit_output("rankings", rankings_ok)
+    log("Now %s UTC = %s PT (%s)." % (
+        now.strftime("%Y-%m-%d %H:%M"), now_pt.strftime("%a %Y-%m-%d %H:%M %Z"),
+        "forced" if force else "gated"))
+    log("Reports? %s: %s" % ("YES" if reports_ok else "NO", why))
+    log("Power/luck? %s: %s" % ("YES" if rankings_ok else "NO", why_rank))
+    if not reports_ok:
         return 0
     try:  # fail closed: no password (or the wrong one) -> write nothing
         K = seal.Key()
